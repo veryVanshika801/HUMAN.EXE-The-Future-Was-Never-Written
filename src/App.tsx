@@ -472,6 +472,7 @@ export function App() {
       <ArtifactModal
         artifact={selectedArtifact}
         narrationEnabled={state.audio.narrationEnabled}
+        reducedMotion={state.reducedMotion}
         onClose={() => setSelectedArtifact(null)}
       />
 
@@ -495,6 +496,7 @@ export function App() {
           handleSelectArtifactObj(art);
         }}
         onRepairFile={handleRepairFile}
+        onNavigateChapter={navigateToChapter}
       />
 
       {/* Archivist's Custom Cursor (Auto-disables on touch/reduced motion) */}

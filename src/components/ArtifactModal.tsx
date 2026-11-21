@@ -25,6 +25,7 @@ import { buildAutopsyArtifactMesh } from '../scenes/artifactMeshes';
 interface ArtifactModalProps {
   artifact: ArtifactItem | null;
   narrationEnabled?: boolean;
+  reducedMotion?: boolean;
   onClose: () => void;
 }
 
@@ -39,12 +40,14 @@ interface ProjectedHotspot {
 interface AutopsyViewportProps {
   artifact: ArtifactItem;
   selectedHotspotId: string;
+  reducedMotion?: boolean;
   onSelectHotspot: (hotspot: ArtifactHotspot) => void;
 }
 
 const ArtifactAutopsyViewport: React.FC<AutopsyViewportProps> = ({
   artifact,
   selectedHotspotId,
+  reducedMotion = false,
   onSelectHotspot,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -152,7 +155,7 @@ const ArtifactAutopsyViewport: React.FC<AutopsyViewportProps> = ({
     let dragging = false;
     let lastX = 0;
     let lastY = 0;
-    let autoSpin = true;
+    let autoSpin = !reducedMotion;
     let disposed = false;
     let rafId = 0;
 
@@ -274,7 +277,7 @@ const ArtifactAutopsyViewport: React.FC<AutopsyViewportProps> = ({
         host.removeChild(renderer.domElement);
       }
     };
-  }, [artifact.id, artifact.layoutMode, artifact.hotspots]);
+  }, [artifact.id, artifact.layoutMode, artifact.hotspots, reducedMotion]);
 
   return (
     <div className="relative h-64 sm:h-72 rounded-xl overflow-hidden bg-[#06080A] border border-white/12 select-none">
@@ -363,6 +366,7 @@ const ArtifactAutopsyViewport: React.FC<AutopsyViewportProps> = ({
 export const ArtifactModal: React.FC<ArtifactModalProps> = ({
   artifact,
   narrationEnabled = false,
+  reducedMotion = false,
   onClose,
 }) => {
   const [selectedHotspotId, setSelectedHotspotId] = useState<string>('');
@@ -374,6 +378,15 @@ export const ArtifactModal: React.FC<ArtifactModalProps> = ({
       setDetailTab('context');
     }
   }, [artifact]);
+
+  useEffect(() => {
+    if (!artifact) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [artifact, onClose]);
 
   const activeHotspot = useMemo(() => {
     if (!artifact) return null;
@@ -459,6 +472,7 @@ export const ArtifactModal: React.FC<ArtifactModalProps> = ({
             <ArtifactAutopsyViewport
               artifact={artifact}
               selectedHotspotId={activeHotspot?.id ?? ''}
+              reducedMotion={reducedMotion}
               onSelectHotspot={(hs) => {
                 audioEngine.playEraSound('click');
                 setSelectedHotspotId(hs.id);

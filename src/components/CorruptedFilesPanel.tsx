@@ -183,6 +183,14 @@ export const CorruptedFilesPanel: React.FC<CorruptedFilesPanelProps> = ({
   const [repairProgress, setRepairProgress] = useState(0);
   const [expandedFileId, setExpandedFileId] = useState<string | null>(null);
   const [cipherTick, setCipherTick] = useState(0);
+  const restoreTimersRef = useRef<number[]>([]);
+
+  useEffect(() => {
+    return () => {
+      restoreTimersRef.current.forEach((id) => window.clearTimeout(id));
+      restoreTimersRef.current = [];
+    };
+  }, []);
 
   useEffect(() => {
     if (reducedMotion) return;
@@ -224,15 +232,18 @@ export const CorruptedFilesPanel: React.FC<CorruptedFilesPanelProps> = ({
     setRepairingId(file.id);
     setRepairProgress(22);
 
-    window.setTimeout(() => setRepairProgress(60), 220);
-    window.setTimeout(() => setRepairProgress(90), 460);
-    window.setTimeout(() => {
-      onRepairFile(file.id);
-      setRepairingId(null);
-      setRepairProgress(0);
-      setActiveLabFileId(null);
-      setExpandedFileId(file.id);
-    }, 740);
+    restoreTimersRef.current.forEach((id) => window.clearTimeout(id));
+    restoreTimersRef.current = [
+      window.setTimeout(() => setRepairProgress(60), 220),
+      window.setTimeout(() => setRepairProgress(90), 460),
+      window.setTimeout(() => {
+        onRepairFile(file.id);
+        setRepairingId(null);
+        setRepairProgress(0);
+        setActiveLabFileId(null);
+        setExpandedFileId(file.id);
+      }, 740),
+    ];
   };
 
   const handlePlaceFragment = (file: CorruptedFileItem, expectedFragId: string, candidateFragId: string) => {
@@ -472,6 +483,9 @@ export const CorruptedFilesPanel: React.FC<CorruptedFilesPanelProps> = ({
                             onClick={() => {
                               if (pickedFragmentId) {
                                 handlePlaceFragment(file, slot.id, pickedFragmentId);
+                              } else if (!matched) {
+                                audioEngine.playEraSound('click');
+                                setMismatchMessage('Select or drag a fragment above first, then click its matching sector.');
                               }
                             }}
                             className={`p-3 rounded border border-dashed text-left transition-colors ${

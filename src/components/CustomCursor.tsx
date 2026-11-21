@@ -105,12 +105,13 @@ export const CustomCursor: React.FC<CustomCursorProps> = ({
           size: 2.2 + Math.random() * 1.4,
         });
       }
-    } else if (burstSignal.type === 'unlock') {
+    } else if (burstSignal.type === 'unlock' || burstSignal.type === 'chapter') {
+      const count = burstSignal.type === 'chapter' ? 5 : 7;
       const originX = p.ringX > 0 ? p.ringX : window.innerWidth * 0.5;
       const originY = p.ringY > 0 ? p.ringY : window.innerHeight * 0.5;
-      for (let i = 0; i < 7; i++) {
-        const ang = (i / 7) * Math.PI * 2;
-        const spd = 1.1 + Math.random() * 1.4;
+      for (let i = 0; i < count; i++) {
+        const ang = (i / count) * Math.PI * 2;
+        const spd = 1.0 + Math.random() * 1.4;
         particlesRef.current.push({
           x: originX,
           y: originY,
@@ -118,7 +119,7 @@ export const CustomCursor: React.FC<CustomCursorProps> = ({
           vy: Math.sin(ang) * spd,
           life: 0,
           maxLife: 0.48,
-          color: '#A6C7A9',
+          color: burstSignal.type === 'chapter' ? eraColorRef.current : '#A6C7A9',
           size: 1.8,
         });
       }

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   X,
   Compass,
@@ -14,7 +14,7 @@ import {
 import { ARTIFACTS, CORRUPTED_FILES, LOST_ARTIFACTS, SECRET_MEMORIES } from '../data/artifacts';
 import { CHAPTERS } from '../data/chapters';
 import { JOURNAL_CLUES } from '../hooks/useArchiveState';
-import { ArchiveProgressState, ArtifactItem, ChapterNumber } from '../types/archive';
+import { ArchiveProgressState, ArtifactItem, ChapterId, ChapterNumber } from '../types/archive';
 import { CorruptedFilesPanel } from './CorruptedFilesPanel';
 
 interface ArchiveCollectionModalProps {
@@ -24,6 +24,7 @@ interface ArchiveCollectionModalProps {
   onClose: () => void;
   onInspectArtifact: (artifact: ArtifactItem) => void;
   onRepairFile: (fileId: string) => void;
+  onNavigateChapter: (chapter: ChapterId) => void;
 }
 
 export const ArchiveCollectionModal: React.FC<ArchiveCollectionModalProps> = ({
@@ -33,10 +34,20 @@ export const ArchiveCollectionModal: React.FC<ArchiveCollectionModalProps> = ({
   onClose,
   onInspectArtifact,
   onRepairFile,
+  onNavigateChapter,
 }) => {
   const [tab, setTab] = useState<'journal' | 'lost' | 'artifacts' | 'files' | 'secrets' | 'events'>('journal');
   const [chapterFilter, setChapterFilter] = useState<ChapterNumber | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
 
   const q = searchQuery.trim().toLowerCase();
   const unlockedClues = state.unlockedClues ?? [];
@@ -288,14 +299,19 @@ export const ArchiveCollectionModal: React.FC<ArchiveCollectionModalProps> = ({
                     const choiceVal = state.decisions[ch.id];
                     const opt = ch.options.find((o) => o.value === choiceVal);
                     return (
-                      <div
+                      <button
                         key={ch.id}
-                        className={`p-3 rounded-lg border ${
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onNavigateChapter(ch.id);
+                        }}
+                        className={`text-left p-3 rounded-lg border transition-colors cursor-pointer ${
                           opt
-                            ? 'bg-[#121D17] border-[#A6C7A9]/45'
+                            ? 'bg-[#121D17] border-[#A6C7A9]/45 hover:border-[#A6C7A9]'
                             : visited
-                            ? 'bg-[#111619] border-white/15'
-                            : 'bg-[#080A0C] border-white/5 opacity-60'
+                            ? 'bg-[#111619] border-white/15 hover:border-white/35'
+                            : 'bg-[#080A0C] border-white/8 opacity-75 hover:opacity-100'
                         }`}
                       >
                         <div className="text-[10px] font-mono-archival text-[#899398]">
@@ -303,9 +319,9 @@ export const ArchiveCollectionModal: React.FC<ArchiveCollectionModalProps> = ({
                         </div>
                         <div className="text-xs font-semibold text-[#F0F2F2] mt-1">{ch.title}</div>
                         <div className="text-[11px] font-mono-archival mt-1.5 text-[#A6C7A9]">
-                          {opt ? `Choice: ${opt.shortTag}` : visited ? 'Awaiting Decision' : 'Not Visited'}
+                          {opt ? `Choice: ${opt.shortTag}` : visited ? 'Awaiting Decision' : 'Visit Era →'}
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Flame, Cog, Cpu, Globe, Sparkles, Compass, X, Check, Lock, KeyRound } from 'lucide-react';
 import { CHAPTERS } from '../data/chapters';
 import { ARTIFACTS, CORRUPTED_FILES, LOST_ARTIFACTS, SECRET_MEMORIES } from '../data/artifacts';
@@ -55,6 +55,15 @@ export const MemoryMapRail: React.FC<MemoryMapRailProps> = ({
     if (num === 1) return true;
     return visitedChapters.includes(num) || Boolean(decisions[`ch${num - 1}` as keyof DecisionsState]);
   };
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCloseModal();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isModalOpen, onCloseModal]);
 
   return (
     <>
@@ -178,9 +187,13 @@ export const MemoryMapRail: React.FC<MemoryMapRailProps> = ({
           role="dialog"
           aria-modal="true"
           aria-labelledby="memory-map-modal-title"
+          onClick={onCloseModal}
           className="no-print fixed inset-0 z-50 bg-[#090B0D]/95 flex items-center justify-center p-4 sm:p-8 overflow-y-auto"
         >
-          <div className="w-full max-w-6xl bg-[#111619] border border-white/12 rounded-xl p-6 sm:p-8 my-auto max-h-[92vh] overflow-y-auto">
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="modal-reveal w-full max-w-6xl bg-[#111619] border border-white/12 rounded-xl p-6 sm:p-8 my-auto max-h-[92vh] overflow-y-auto"
+          >
             <div className="flex items-start justify-between gap-4 pb-5 border-b border-white/10">
               <div>
                 <div className="text-xs font-mono-archival text-[#899398]">

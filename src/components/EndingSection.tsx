@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Download,
   Printer,
@@ -125,6 +125,15 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
     () => calculateLiveHumanityIndex(state.decisions, state),
     [state]
   );
+
+  useEffect(() => {
+    if (!compareOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setCompareOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [compareOpen]);
 
   const all48Paths = useMemo(() => getAll48PathsSummary(), []);
   const filtered48Paths = useMemo(
@@ -367,7 +376,7 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
               className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-medium bg-[#090B0D] border border-[#D9822B]/50 hover:border-[#D9822B] text-[#D9822B] rounded transition-colors cursor-pointer whitespace-nowrap"
             >
               <RotateCcw className="w-4 h-4" aria-hidden="true" />
-              <span>Replay History</span>
+              <span>Replay Choices (Keep Discoveries)</span>
             </button>
           </div>
         </div>
