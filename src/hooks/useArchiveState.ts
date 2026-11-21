@@ -300,6 +300,199 @@ function addClueUnique(existing: string[] | undefined, clueId: string): string[]
   return list.includes(clueId) ? list : [...list, clueId];
 }
 
+export function applyInspectArtifact(
+  prev: ArchiveProgressState,
+  artifactId: string
+): { nextState: ArchiveProgressState; newlyUnlockedSecrets: string[] } {
+  const artifact = ARTIFACTS.find((a) => a.id === artifactId);
+  const nextInspected = prev.inspectedArtifacts.includes(artifactId)
+    ? prev.inspectedArtifacts
+    : [...prev.inspectedArtifacts, artifactId];
+
+  const shouldUnlockSecret002 =
+    (artifactId === 'art-clockwork-machine' ||
+      nextInspected.includes('art-clockwork-machine')) &&
+    Boolean(prev.visitedTerminalCode) &&
+    !prev.unlockedSecrets.includes('secret-002');
+
+  const shouldUnlockSecret005 =
+    ['art-neural-core', 'art-creative-engine', 'art-human-memory'].every((id) =>
+      nextInspected.includes(id)
+    ) && !prev.unlockedSecrets.includes('secret-005');
+
+  const newlyUnlockedSecrets: string[] = [];
+  const nextSecrets = [...prev.unlockedSecrets];
+  let nextClues = prev.unlockedClues ?? [];
+  if (artifactId === 'art-clockwork-machine') {
+    nextClues = addClueUnique(nextClues, 'clue-lovelace-bridge');
+  }
+  const events = [...prev.eventLog];
+
+  if (!prev.inspectedArtifacts.includes(artifactId) && artifact) {
+    events.unshift(
+      makeEvent(
+        `ch${artifact.chapter}` as ChapterId,
+        'artifact',
+        `Inspected ${artifact.name}`,
+        artifact.summary
+      )
+    );
+  }
+
+  if (shouldUnlockSecret002) {
+    newlyUnlockedSecrets.push('secret-002');
+    nextSecrets.push('secret-002');
+    const sec = SECRET_MEMORIES.find((s) => s.id === 'secret-002');
+    events.unshift(
+      makeEvent(
+        'ch3',
+        'secret',
+        `Secret Discovered · ${sec?.title}`,
+        sec?.historicalInsight ?? ''
+      )
+    );
+  }
+
+  if (shouldUnlockSecret005) {
+    newlyUnlockedSecrets.push('secret-005');
+    nextSecrets.push('secret-005');
+    const sec = SECRET_MEMORIES.find((s) => s.id === 'secret-005');
+    events.unshift(
+      makeEvent(
+        'ch5',
+        'secret',
+        `Secret Discovered · ${sec?.title}`,
+        sec?.historicalInsight ?? ''
+      )
+    );
+  }
+
+  return {
+    nextState: {
+      ...prev,
+      inspectedArtifacts: nextInspected,
+      unlockedSecrets: nextSecrets,
+      unlockedClues: nextClues,
+      eventLog: events.slice(0, 80),
+    },
+    newlyUnlockedSecrets,
+  };
+}
+
+export function applyMarkTerminalCodeVisited(
+  prev: ArchiveProgressState
+): { nextState: ArchiveProgressState; unlockedLovelace: boolean } {
+  const nextClues = addClueUnique(prev.unlockedClues, 'clue-lovelace-bridge');
+  if (
+    prev.inspectedArtifacts.includes('art-clockwork-machine') &&
+    !prev.unlockedSecrets.includes('secret-002')
+  ) {
+    const sec = SECRET_MEMORIES.find((s) => s.id === 'secret-002');
+    return {
+      unlockedLovelace: true,
+      nextState: {
+        ...prev,
+        visitedTerminalCode: true,
+        unlockedSecrets: [...prev.unlockedSecrets, 'secret-002'],
+        unlockedClues: nextClues,
+        eventLog: [
+          makeEvent(
+            'ch3',
+            'secret',
+            `Secret Discovered · ${sec?.title}`,
+            sec?.historicalInsight ?? ''
+          ),
+          ...prev.eventLog,
+        ].slice(0, 80),
+      },
+    };
+  }
+  return {
+    unlockedLovelace: false,
+    nextState: {
+      ...prev,
+      visitedTerminalCode: true,
+      unlockedClues: nextClues,
+    },
+  };
+}
+
+export function applyDiscoverLostArtifact(
+  prev: ArchiveProgressState,
+  lostId: string
+): ArchiveProgressState {
+  if (prev.discoveredLostArtifacts.includes(lostId)) return prev;
+  const lost = LOST_ARTIFACTS.find((l) => l.id === lostId);
+  let nextClues = prev.unlockedClues ?? [];
+  if (lostId === 'lost-005') nextClues = addClueUnique(nextClues, 'clue-2075-quorum');
+  return {
+    ...prev,
+    discoveredLostArtifacts: [...prev.discoveredLostArtifacts, lostId],
+    unlockedClues: nextClues,
+    eventLog: [
+      makeEvent(
+        `ch${lost?.chapter ?? 1}` as ChapterId,
+        'lost',
+        `Lost Memory Recovered · ${lost?.name ?? lostId}`,
+        lost?.title ?? ''
+      ),
+      ...prev.eventLog,
+    ].slice(0, 80),
+  };
+}
+
+export function applyRepairFile(
+  prev: ArchiveProgressState,
+  fileId: string
+): { nextState: ArchiveProgressState; unlockedQuorum: boolean } {
+  const file = CORRUPTED_FILES.find((f) => f.id === fileId);
+  const nextRepaired = prev.repairedFiles.includes(fileId)
+    ? prev.repairedFiles
+    : [...prev.repairedFiles, fileId];
+
+  let nextSecrets = prev.unlockedSecrets;
+  let nextClues = prev.unlockedClues ?? [];
+  const events = [...prev.eventLog];
+
+  if (!prev.repairedFiles.includes(fileId) && file) {
+    events.unshift(
+      makeEvent(
+        `ch${file.chapter}` as ChapterId,
+        'file',
+        `Restored ${file.filename}`,
+        file.hiddenMemoryTitle
+      )
+    );
+  }
+
+  let unlockedQuorum = false;
+  if (fileId === 'file-unknown-2075' && !prev.unlockedSecrets.includes('secret-003')) {
+    unlockedQuorum = true;
+    nextSecrets = [...nextSecrets, 'secret-003'];
+    nextClues = addClueUnique(nextClues, 'clue-2075-quorum');
+    const sec = SECRET_MEMORIES.find((s) => s.id === 'secret-003');
+    events.unshift(
+      makeEvent(
+        'ch5',
+        'secret',
+        `Secret Discovered · ${sec?.title}`,
+        sec?.historicalInsight ?? ''
+      )
+    );
+  }
+
+  return {
+    unlockedQuorum,
+    nextState: {
+      ...prev,
+      repairedFiles: nextRepaired,
+      unlockedSecrets: nextSecrets,
+      unlockedClues: nextClues,
+      eventLog: events.slice(0, 80),
+    },
+  };
+}
+
 export function useArchiveState() {
   const [state, setState] = useState<ArchiveProgressState>(loadState);
 
@@ -424,81 +617,16 @@ export function useArchiveState() {
       const artifact = ARTIFACTS.find((a) => a.id === artifactId);
       audioEngine.playEraSound(artifact?.soundType ?? 'click');
 
-      const newlyUnlockedSecrets: string[] = [];
+      let unlockedIds: string[] = [];
       setState((prev) => {
-        const nextInspected = prev.inspectedArtifacts.includes(artifactId)
-          ? prev.inspectedArtifacts
-          : [...prev.inspectedArtifacts, artifactId];
-
-        const shouldUnlockSecret002 =
-          (artifactId === 'art-clockwork-machine' ||
-            nextInspected.includes('art-clockwork-machine')) &&
-          Boolean(prev.visitedTerminalCode) &&
-          !prev.unlockedSecrets.includes('secret-002');
-
-        const shouldUnlockSecret005 =
-          ['art-neural-core', 'art-creative-engine', 'art-human-memory'].every((id) =>
-            nextInspected.includes(id)
-          ) && !prev.unlockedSecrets.includes('secret-005');
-
-        let nextSecrets = [...prev.unlockedSecrets];
-        let nextClues = prev.unlockedClues ?? [];
-        if (artifactId === 'art-clockwork-machine') {
-          nextClues = addClueUnique(nextClues, 'clue-lovelace-bridge');
-        }
-        const events = [...prev.eventLog];
-
-        if (!prev.inspectedArtifacts.includes(artifactId) && artifact) {
-          events.unshift(
-            makeEvent(
-              `ch${artifact.chapter}` as ChapterId,
-              'artifact',
-              `Inspected ${artifact.name}`,
-              artifact.summary
-            )
-          );
-        }
-
-        if (shouldUnlockSecret002) {
-          newlyUnlockedSecrets.push('secret-002');
-          nextSecrets.push('secret-002');
-          const sec = SECRET_MEMORIES.find((s) => s.id === 'secret-002');
-          events.unshift(
-            makeEvent(
-              'ch3',
-              'secret',
-              `Secret Discovered · ${sec?.title}`,
-              sec?.historicalInsight ?? ''
-            )
-          );
-        }
-
-        if (shouldUnlockSecret005) {
-          newlyUnlockedSecrets.push('secret-005');
-          nextSecrets.push('secret-005');
-          const sec = SECRET_MEMORIES.find((s) => s.id === 'secret-005');
-          events.unshift(
-            makeEvent(
-              'ch5',
-              'secret',
-              `Secret Discovered · ${sec?.title}`,
-              sec?.historicalInsight ?? ''
-            )
-          );
-        }
-
-        return {
-          ...prev,
-          inspectedArtifacts: nextInspected,
-          unlockedSecrets: nextSecrets,
-          unlockedClues: nextClues,
-          eventLog: events.slice(0, 80),
-        };
+        const res = applyInspectArtifact(prev, artifactId);
+        unlockedIds = res.newlyUnlockedSecrets;
+        return res.nextState;
       });
 
-      if (newlyUnlockedSecrets.length > 0) {
+      if (unlockedIds.length > 0) {
         audioEngine.playEraSound('secret');
-        onSecretDiscovered?.(newlyUnlockedSecrets[0]);
+        onSecretDiscovered?.(unlockedIds[0]);
       }
     },
     []
@@ -510,34 +638,9 @@ export function useArchiveState() {
       let unlockedLovelace = false;
 
       setState((prev) => {
-        const nextClues = addClueUnique(prev.unlockedClues, 'clue-lovelace-bridge');
-        if (
-          prev.inspectedArtifacts.includes('art-clockwork-machine') &&
-          !prev.unlockedSecrets.includes('secret-002')
-        ) {
-          unlockedLovelace = true;
-          const sec = SECRET_MEMORIES.find((s) => s.id === 'secret-002');
-          return {
-            ...prev,
-            visitedTerminalCode: true,
-            unlockedSecrets: [...prev.unlockedSecrets, 'secret-002'],
-            unlockedClues: nextClues,
-            eventLog: [
-              makeEvent(
-                'ch3',
-                'secret',
-                `Secret Discovered · ${sec?.title}`,
-                sec?.historicalInsight ?? ''
-              ),
-              ...prev.eventLog,
-            ].slice(0, 80),
-          };
-        }
-        return {
-          ...prev,
-          visitedTerminalCode: true,
-          unlockedClues: nextClues,
-        };
+        const res = applyMarkTerminalCodeVisited(prev);
+        unlockedLovelace = res.unlockedLovelace;
+        return res.nextState;
       });
 
       if (unlockedLovelace) {
@@ -550,76 +653,18 @@ export function useArchiveState() {
 
   const discoverLostArtifact = useCallback((lostId: string) => {
     audioEngine.playLostArtifactFanfare();
-    const lost = LOST_ARTIFACTS.find((l) => l.id === lostId);
-    setState((prev) => {
-      if (prev.discoveredLostArtifacts.includes(lostId)) return prev;
-      let nextClues = prev.unlockedClues ?? [];
-      if (lostId === 'lost-005') nextClues = addClueUnique(nextClues, 'clue-2075-quorum');
-      return {
-        ...prev,
-        discoveredLostArtifacts: [...prev.discoveredLostArtifacts, lostId],
-        unlockedClues: nextClues,
-        eventLog: [
-          makeEvent(
-            `ch${lost?.chapter ?? 1}` as ChapterId,
-            'lost',
-            `Lost Memory Recovered · ${lost?.name ?? lostId}`,
-            lost?.title ?? ''
-          ),
-          ...prev.eventLog,
-        ].slice(0, 80),
-      };
-    });
+    setState((prev) => applyDiscoverLostArtifact(prev, lostId));
   }, []);
 
   const repairFile = useCallback(
     (fileId: string, onSecretDiscovered?: (secretId: string) => void) => {
       audioEngine.playEraSound('repairSuccess');
-      const file = CORRUPTED_FILES.find((f) => f.id === fileId);
       let unlockedQuorum = false;
 
       setState((prev) => {
-        const nextRepaired = prev.repairedFiles.includes(fileId)
-          ? prev.repairedFiles
-          : [...prev.repairedFiles, fileId];
-
-        let nextSecrets = prev.unlockedSecrets;
-        let nextClues = prev.unlockedClues ?? [];
-        const events = [...prev.eventLog];
-
-        if (!prev.repairedFiles.includes(fileId) && file) {
-          events.unshift(
-            makeEvent(
-              `ch${file.chapter}` as ChapterId,
-              'file',
-              `Restored ${file.filename}`,
-              file.hiddenMemoryTitle
-            )
-          );
-        }
-
-        if (fileId === 'file-unknown-2075' && !prev.unlockedSecrets.includes('secret-003')) {
-          unlockedQuorum = true;
-          nextSecrets = [...nextSecrets, 'secret-003'];
-          nextClues = addClueUnique(nextClues, 'clue-2075-quorum');
-          const sec = SECRET_MEMORIES.find((s) => s.id === 'secret-003');
-          events.unshift(
-            makeEvent(
-              'ch5',
-              'secret',
-              `Secret Discovered · ${sec?.title}`,
-              sec?.historicalInsight ?? ''
-            )
-          );
-        }
-
-        return {
-          ...prev,
-          repairedFiles: nextRepaired,
-          unlockedSecrets: nextSecrets,
-          unlockedClues: nextClues,
-          eventLog: events.slice(0, 80),
-        };
+        const res = applyRepairFile(prev, fileId);
+        unlockedQuorum = res.unlockedQuorum;
+        return res.nextState;
       });
 
       if (unlockedQuorum) {

@@ -26,6 +26,7 @@ import {
   resolvePathOutcome,
 } from '../logic/decisionEngine';
 import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
+import { buildArchiveReportHtml, buildArchiveReportText } from '../utils/archiveReport';
 
 interface EndingSectionProps {
   state: ArchiveProgressState;
@@ -181,59 +182,26 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
     setCompareOpen(true);
   };
 
-  const handleDownloadReport = () => {
-    const decisionLines = CHAPTERS.map((ch) => {
-      const factor = humanityIndex.decisionFactorsByChapter[ch.number];
-      if (factor.status === 'pending') {
-        return `- CH 0${ch.number} (${ch.title}): PENDING — Not decided yet`;
-      }
-      const d = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
-      return `- CH 0${ch.number} (${ch.title}): ${factor.optionLabel} [INN ${d(factor.innovationDelta)}, CON ${d(factor.connectionDelta)}, AGN ${d(factor.agencyDelta)}]`;
-    });
-
-    const lines = [
-      'HUMAN.EXE — ARCHIVIST OFFICIAL DOSSIER (2075)',
-      '=============================================',
-      `Status: ${outcome.isComplete ? `FINALIZED ARCHIVE RECORD (${outcome.pathIndex} / 48)` : `DRAFT TELEMETRY (${outcome.selectedCount} / 5 DECISIONS RECORDED)`}`,
-      `Archive Profile ID: ${outcome.pathId}`,
-      `Decision Signature: ${outcome.signature}`,
-      `Classification: ${outcome.archetypeTitle}`,
-      `Path Title: ${outcome.pathTitle}`,
-      `Overall Archive Completion: ${completionPercentage}%`,
-      '',
-      '1. RECORDED CHAPTER DECISIONS',
-      ...decisionLines,
-      '',
-      '2. HUMANITY INDEX BREAKDOWN',
-      `- Baseline Calibration: Innovation ${humanityIndex.baselineScores.innovation}%, Connection ${humanityIndex.baselineScores.connection}%, Human Agency ${humanityIndex.baselineScores.humanAgency}%`,
-      `- Exploration Bonuses: Innovation +${humanityIndex.explorationBonuses.innovation}% (${state.inspectedArtifacts.length} artifacts), Connection +${humanityIndex.explorationBonuses.connection}% (${state.discoveredLostArtifacts.length} lost memories, ${state.unlockedSecrets.length} secrets), Agency +${humanityIndex.explorationBonuses.humanAgency}% (${state.repairedFiles.length} repaired files)`,
-      `- Composite Result -> Innovation: ${humanityIndex.innovation}% | Connection: ${humanityIndex.connection}% | Human Agency: ${humanityIndex.humanAgency}% | Overall Balance: ${humanityIndex.overallScore}%`,
-      '',
-      '3. NARRATIVE SYNTHESIS',
-      outcome.historicalSummary,
-      '',
-      outcome.futureDescription,
-      '',
-      outcome.finalArchiveMessage,
-      '',
-      `4. RECOVERED EXHIBITS & FILES`,
-      `Artifacts Inspected (${inspectedItems.length}/${ARTIFACTS.length}): ${inspectedItems.length > 0 ? inspectedItems.map((a) => `${a.accessionCode} ${a.name}`).join('; ') : 'None inspected yet'}`,
-      `Lost Memories Discovered (${lostItems.length}/${LOST_ARTIFACTS.length}): ${lostItems.length > 0 ? lostItems.map((l) => `${l.memoryCode} ${l.title}`).join('; ') : 'None recovered yet'}`,
-      `Corrupted Files Repaired (${repairedItems.length}/${CORRUPTED_FILES.length}): ${repairedItems.length > 0 ? repairedItems.map((f) => f.filename).join('; ') : 'None repaired yet'}`,
-      `Secret Archives Unlocked (${secretItems.length}/${SECRET_MEMORIES.length}): ${secretItems.length > 0 ? secretItems.map((s) => `${s.code} ${s.title}`).join('; ') : 'None unlocked yet'}`,
-      '',
-      'Technology is what we build. The future is what we choose.',
-      'HUMAN.EXE — Digital Archaeology Museum',
-    ];
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  const triggerDownload = (content: string, mimeType: string, filename: string) => {
+    const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${outcome.pathId}.txt`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const handleDownloadHtmlDossier = () => {
+    const html = buildArchiveReportHtml(state, outcome, completionPercentage);
+    triggerDownload(html, 'text/html;charset=utf-8', `${outcome.pathId}-dossier.html`);
+  };
+
+  const handleDownloadTxtReport = () => {
+    const txt = buildArchiveReportText(state, outcome, completionPercentage);
+    triggerDownload(txt, 'text/plain;charset=utf-8', `${outcome.pathId}.txt`);
   };
 
   return (
@@ -522,11 +490,20 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
 
             <button
               type="button"
-              onClick={handleDownloadReport}
-              className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-medium bg-[#090B0D] border border-white/15 hover:border-white/40 text-[#F0F2F2] rounded transition-colors cursor-pointer whitespace-nowrap"
+              onClick={handleDownloadHtmlDossier}
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-medium bg-[#090B0D] border border-white/25 hover:border-[#A6C7A9] text-[#F0F2F2] rounded transition-colors cursor-pointer whitespace-nowrap"
             >
-              <Download className="w-4 h-4" aria-hidden="true" />
-              <span>Download Report</span>
+              <Download className="w-4 h-4 text-[#A6C7A9]" aria-hidden="true" />
+              <span>Download HTML Dossier</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadTxtReport}
+              className="inline-flex items-center gap-2 px-3.5 py-2.5 text-xs font-mono-archival bg-[#090B0D] border border-white/15 hover:border-white/40 text-[#BFC7CB] hover:text-[#F0F2F2] rounded transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Export TXT</span>
             </button>
 
             <button

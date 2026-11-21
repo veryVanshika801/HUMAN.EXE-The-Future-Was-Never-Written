@@ -33,7 +33,8 @@ export const ArchivistModal: React.FC<ArchivistModalProps> = ({
   const [messages, setMessages] = useState<ArchivistMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [missingKeyNotice, setMissingKeyNotice] = useState(false);
+  const [errorTitle, setErrorTitle] = useState<string>('TRANSMISSION ERROR');
+  const [allowRetry, setAllowRetry] = useState<boolean>(true);
   const [lastFailedQuestion, setLastFailedQuestion] = useState<string | null>(null);
 
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -67,7 +68,8 @@ export const ArchivistModal: React.FC<ArchivistModalProps> = ({
 
     audioEngine.playEraSound('click');
     setErrorMsg(null);
-    setMissingKeyNotice(false);
+    setErrorTitle('TRANSMISSION ERROR');
+    setAllowRetry(true);
     setLastFailedQuestion(null);
 
     const userMsg: ArchivistMessage = {
@@ -124,8 +126,19 @@ export const ArchivistModal: React.FC<ArchivistModalProps> = ({
         | null;
 
       if (!response.ok || !data?.ok || !data.answer) {
-        if (data?.code === 'MISSING_API_KEY') {
-          setMissingKeyNotice(true);
+        const code = data?.code ?? 'UPSTREAM_ERROR';
+        if (code === 'MISSING_API_KEY' || code === 'INVALID_API_KEY') {
+          setErrorTitle('SERVER ARCHIVIST CREDENTIAL OFFLINE');
+          setAllowRetry(false);
+        } else if (code === 'INVALID_MODEL_CONFIG') {
+          setErrorTitle('MODEL CONFIGURATION ERROR');
+          setAllowRetry(false);
+        } else if (code === 'QUOTA_EXCEEDED' || code === 'RATE_LIMITED') {
+          setErrorTitle(code === 'QUOTA_EXCEEDED' ? 'API QUOTA REACHED' : 'RATE LIMIT ACTIVE');
+          setAllowRetry(true);
+        } else {
+          setErrorTitle('TRANSMISSION ERROR');
+          setAllowRetry(true);
         }
         setErrorMsg(
           data?.error || `Archivist service unavailable (HTTP ${response.status}). Please try again.`
@@ -273,15 +286,15 @@ export const ArchivistModal: React.FC<ArchivistModalProps> = ({
             >
               <div className="flex items-center gap-2 font-mono-archival text-[#D9822B]">
                 <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
-                <span>{missingKeyNotice ? 'SERVER API KEY NOT CONFIGURED' : 'TRANSMISSION ERROR'}</span>
+                <span>{errorTitle}</span>
               </div>
               <p className="text-[#BFC7CB] leading-relaxed">{errorMsg}</p>
-              {missingKeyNotice && (
+              {errorTitle === 'SERVER ARCHIVIST CREDENTIAL OFFLINE' && (
                 <p className="text-[11px] font-mono-archival text-[#899398]">
                   Configure GEMINI_API_KEY in server environment variables (.env locally or Vercel Project Settings) to enable live Archivist AI responses.
                 </p>
               )}
-              {lastFailedQuestion && !missingKeyNotice && (
+              {lastFailedQuestion && allowRetry && (
                 <button
                   type="button"
                   onClick={() => void submitQuery(lastFailedQuestion)}

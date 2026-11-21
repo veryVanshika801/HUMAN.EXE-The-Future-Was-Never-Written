@@ -198,7 +198,7 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.12;
-    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 1.75));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = !isSoftwareGl;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -208,12 +208,26 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
 
     container.appendChild(renderer.domElement);
 
+    let contextLost = false;
     const handleContextLost = (e: Event) => {
       e.preventDefault();
+      contextLost = true;
+      hoveredObjectId = null;
+      callbacksRef.current.onHoverTarget?.(null);
+      renderer.domElement.style.cursor = 'default';
+      cancelAnimationFrame(frameId);
+      clearTimeout(frameId);
       setWebglError(true);
     };
     const handleContextRestored = () => {
+      contextLost = false;
+      hoveredObjectId = null;
+      callbacksRef.current.onHoverTarget?.(null);
       setWebglError(false);
+      clock.getDelta();
+      if (!disposed) {
+        frameId = requestAnimationFrame(tick);
+      }
     };
     renderer.domElement.addEventListener('webglcontextlost', handleContextLost);
     renderer.domElement.addEventListener('webglcontextrestored', handleContextRestored);
@@ -1797,7 +1811,7 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
     }
 
     const tick = () => {
-      if (disposed) return;
+      if (disposed || contextLost) return;
       const delta = Math.min(clock.getDelta(), 0.1);
       const elapsed = clock.getElapsedTime();
       const s = stateRef.current;
@@ -2455,22 +2469,27 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
     };
   }, []);
 
-  if (webglError) {
-    return (
-      <div
-        aria-hidden="true"
-        className="fixed inset-0 z-0 pointer-events-none bg-[#090B0D] flex items-center justify-end pr-16 overflow-hidden"
-      >
-        <div className="w-[420px] h-[420px] rounded-full border border-[#BFC7CB]/20 bg-[radial-gradient(circle_at_center,rgba(166,199,169,0.14)_0%,rgba(17,22,25,0.6)_55%,transparent_75%)] flex items-center justify-center">
-          <div className="w-60 h-60 rounded-full border border-[#A6C7A9]/30 flex items-center justify-center">
-            <div className="w-24 h-24 rounded-full bg-[#BFC7CB]/20 border border-[#BFC7CB]/50" />
+  return (
+    <>
+      <div ref={mountRef} className="fixed inset-0 z-0" aria-label="Interactive 3D Archive Stage" />
+      {webglError && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed inset-0 z-0 pointer-events-none bg-[#090B0D] flex flex-col items-end justify-center pr-6 sm:pr-16 overflow-hidden"
+        >
+          <div className="w-[300px] h-[300px] sm:w-[420px] sm:h-[420px] rounded-full border border-[#BFC7CB]/20 bg-[radial-gradient(circle_at_center,rgba(166,199,169,0.14)_0%,rgba(17,22,25,0.6)_55%,transparent_75%)] flex items-center justify-center">
+            <div className="w-44 h-44 sm:w-60 sm:h-60 rounded-full border border-[#A6C7A9]/30 flex items-center justify-center">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#BFC7CB]/20 border border-[#BFC7CB]/50" />
+            </div>
+          </div>
+          <div className="mt-4 px-3 py-1.5 rounded bg-[#111619]/90 border border-white/10 text-[11px] font-mono-archival text-[#899398]">
+            3D WebGL stage paused — 2D archival mode active
           </div>
         </div>
-      </div>
-    );
-  }
-
-  return <div ref={mountRef} className="fixed inset-0 z-0" aria-label="Interactive 3D Archive Stage" />;
+      )}
+    </>
+  );
 };
 
 export default ArchiveCanvas;

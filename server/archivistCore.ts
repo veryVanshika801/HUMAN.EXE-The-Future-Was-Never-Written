@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 
 export interface ArchivistHistoryMessage {
   role: 'user' | 'model';
@@ -30,8 +30,19 @@ export interface ArchivistRequestPayload {
   archiveContext?: unknown;
 }
 
+export type ArchivistErrorCode =
+  | 'MISSING_API_KEY'
+  | 'INVALID_API_KEY'
+  | 'INVALID_MODEL_CONFIG'
+  | 'INVALID_REQUEST'
+  | 'PAYLOAD_TOO_LARGE'
+  | 'RATE_LIMITED'
+  | 'QUOTA_EXCEEDED'
+  | 'UPSTREAM_ERROR';
+
 export interface ArchivistResult {
   status: number;
+  headers?: Record<string, string>;
   body:
     | {
         ok: true;
@@ -42,12 +53,41 @@ export interface ArchivistResult {
     | {
         ok: false;
         configured: boolean;
-        code: 'MISSING_API_KEY' | 'INVALID_REQUEST' | 'UPSTREAM_ERROR';
+        code: ArchivistErrorCode;
         error: string;
+        retryAfterSeconds?: number;
       };
 }
 
-const MODEL_ID = 'gemini-4-hydrogen';
+export const MAX_ARCHIVIST_PAYLOAD_BYTES = 32 * 1024;
+export const MAX_QUESTION_LENGTH = 1200;
+export const MAX_HISTORY_ITEMS = 8;
+export const MAX_HISTORY_TEXT_LENGTH = 2000;
+export const DEFAULT_ARCHIVIST_MODEL = 'gemini-4-hydrogen';
+
+const SUPPORTED_GEMINI_MODELS = new Set([
+  'gemini-4-hydrogen',
+  'gemini-3.1-flash-lite',
+]);
+
+const VALID_ACTIVE_CHAPTERS = new Set([
+  'intro',
+  'ch1',
+  'ch2',
+  'ch3',
+  'ch4',
+  'ch5',
+  'ending',
+  'credits',
+]);
+
+const VALID_DECISION_VALUES: Record<string, Set<string>> = {
+  ch1: new Set(['share', 'restrict']),
+  ch2: new Set(['productivity', 'purpose']),
+  ch3: new Set(['open', 'privacy']),
+  ch4: new Set(['total_connection', 'digital_privacy']),
+  ch5: new Set(['ai_leads', 'humans_lead', 'collaborate']),
+};
 
 const SYSTEM_INSTRUCTION = `You are THE ARCHIVIST, the resident curatorial intelligence of HUMAN.EXE — a Year 2075 Digital Archaeology Museum.
 
@@ -63,75 +103,482 @@ STRICT FACT VS. SPECULATION RULE:
 - Explicitly separate DOCUMENTED HISTORY (real historical inventions, pioneers like Ada Lovelace, James Watt, Tim Berners-Lee, Alan Turing, Grace Hopper, real computing & network milestones) from 2075 SPECULATIVE ARCHIVE (the fictional museum setting, fictional lost/corrupted logs like UNKNOWN_ARCHIVE_2075.LOG, and simulated 2075 timeline consequences).
 - Label your grounding briefly when helpful (e.g., "[Historical Record]" vs "[2075 Speculative Archive]") so visitors never confuse speculative storytelling with historical fact.
 - Ground every response in the visitor's actual Archive Context provided below (only reference choices, artifacts, lost memories, files, and secrets they have actually inspected or decided—never invent fake progress they did not make).
-- Keep answers scannable (2–4 concise paragraphs or compact bullet points). Do not break character into meta developer chatter.`;
+- Keep answers scannable and focused: 2-4 short paragraphs or compact bullet points (roughly 120-260 words). Do not break character into meta developer chatter.`;
 
-function sanitizeStringList(input: unknown, maxItems = 24): string[] {
-  if (!Array.isArray(input)) return [];
-  return input
-    .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
-    .slice(0, maxItems)
-    .map((s) => s.trim().slice(0, 80));
+export interface RateLimitDecision {
+  allowed: boolean;
+  remaining: number;
+  retryAfterSeconds: number;
 }
 
-function sanitizeHistory(input: unknown): ArchivistHistoryMessage[] {
-  if (!Array.isArray(input)) return [];
-  const cleaned: ArchivistHistoryMessage[] = [];
-  for (const item of input.slice(-8)) {
-    if (!item || typeof item !== 'object') continue;
-    const obj = item as Record<string, unknown>;
-    if ((obj.role === 'user' || obj.role === 'model') && typeof obj.text === 'string') {
-      const text = obj.text.trim().slice(0, 2000);
-      if (text) cleaned.push({ role: obj.role, text });
+export interface RateLimiter {
+  check: (key: string, nowMs?: number) => RateLimitDecision;
+  reset: () => void;
+}
+
+export function createRateLimiter(
+  maxRequests = 15,
+  windowMs = 60_000,
+  maxTrackedClients = 5000
+): RateLimiter {
+  const buckets = new Map<string, number[]>();
+
+  return {
+    check(rawKey: string, nowMs = Date.now()): RateLimitDecision {
+      const key = (rawKey || 'unknown').slice(0, 128);
+      const cutoff = nowMs - windowMs;
+      const existing = buckets.get(key) ?? [];
+      const active = existing.filter((ts) => ts > cutoff);
+
+      if (active.length >= maxRequests) {
+        const oldestActive = active[0];
+        const retryAfterSeconds = Math.max(1, Math.ceil((oldestActive + windowMs - nowMs) / 1000));
+        buckets.set(key, active);
+        return {
+          allowed: false,
+          remaining: 0,
+          retryAfterSeconds,
+        };
+      }
+
+      active.push(nowMs);
+      buckets.set(key, active);
+
+      if (buckets.size > maxTrackedClients) {
+        for (const [entryKey, timestamps] of buckets.entries()) {
+          const stillValid = timestamps.some((ts) => ts > cutoff);
+          if (!stillValid) {
+            buckets.delete(entryKey);
+          }
+          if (buckets.size <= maxTrackedClients) break;
+        }
+        if (buckets.size > maxTrackedClients) {
+          const oldestKey = buckets.keys().next().value;
+          if (oldestKey !== undefined) buckets.delete(oldestKey);
+        }
+      }
+
+      return {
+        allowed: true,
+        remaining: Math.max(0, maxRequests - active.length),
+        retryAfterSeconds: 0,
+      };
+    },
+    reset() {
+      buckets.clear();
+    },
+  };
+}
+
+export const defaultArchivistRateLimiter = createRateLimiter(15, 60_000);
+
+export function extractClientIp(
+  headers: Record<string, string | string[] | undefined> | undefined,
+  fallbackIp?: string
+): string {
+  if (headers) {
+    const forwarded = headers['x-forwarded-for'] ?? headers['X-Forwarded-For'];
+    const rawForwarded = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+    if (typeof rawForwarded === 'string' && rawForwarded.trim()) {
+      const firstHop = rawForwarded.split(',')[0]?.trim();
+      if (firstHop) return firstHop.slice(0, 64);
+    }
+    const realIp = headers['x-real-ip'] ?? headers['X-Real-IP'];
+    const rawRealIp = Array.isArray(realIp) ? realIp[0] : realIp;
+    if (typeof rawRealIp === 'string' && rawRealIp.trim()) {
+      return rawRealIp.trim().slice(0, 64);
     }
   }
-  return cleaned;
+  return (fallbackIp || '127.0.0.1').slice(0, 64);
 }
 
-function formatArchiveContext(raw: unknown): string {
-  if (!raw || typeof raw !== 'object') {
-    return 'Visitor Archive State: Initial entry (no recorded metadata provided).';
+function isPlainObject(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
+}
+
+function stripControlChars(str: string): string {
+  return str.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim();
+}
+
+function sanitizeIdList(input: unknown, maxItems = 24): string[] {
+  if (!Array.isArray(input)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of input.slice(0, maxItems)) {
+    if (typeof item !== 'string') continue;
+    const cleaned = stripControlChars(item).slice(0, 64);
+    if (cleaned && /^[a-z0-9._-]+$/i.test(cleaned) && !seen.has(cleaned)) {
+      seen.add(cleaned);
+      out.push(cleaned);
+    }
   }
-  const ctx = raw as Record<string, unknown>;
-  const decisions =
-    ctx.decisions && typeof ctx.decisions === 'object'
-      ? (ctx.decisions as Record<string, unknown>)
-      : {};
+  return out;
+}
+
+function validateAndSanitizeHistory(
+  input: unknown
+): { ok: true; history: ArchivistHistoryMessage[] } | { ok: false; error: string } {
+  if (input === undefined) return { ok: true, history: [] };
+  if (!Array.isArray(input)) {
+    return { ok: false, error: 'Conversation history must be an array.' };
+  }
+  if (input.length > 24) {
+    return { ok: false, error: 'Conversation history exceeds the maximum turn limit.' };
+  }
+
+  const cleaned: ArchivistHistoryMessage[] = [];
+  for (const item of input.slice(-MAX_HISTORY_ITEMS)) {
+    if (!isPlainObject(item)) {
+      return { ok: false, error: 'Each conversation history item must be an object.' };
+    }
+    if (item.role !== 'user' && item.role !== 'model') {
+      return { ok: false, error: 'History role must be "user" or "model".' };
+    }
+    if (typeof item.text !== 'string') {
+      return { ok: false, error: 'History item text must be a string.' };
+    }
+    const text = stripControlChars(item.text).slice(0, MAX_HISTORY_TEXT_LENGTH);
+    if (text) cleaned.push({ role: item.role, text });
+  }
+  return { ok: true, history: cleaned };
+}
+
+function formatArchiveContext(
+  raw: unknown
+): { ok: true; block: string } | { ok: false; error: string } {
+  if (raw === undefined || raw === null) {
+    return {
+      ok: true,
+      block: 'Visitor Archive State: Initial entry (no recorded metadata provided).',
+    };
+  }
+  if (!isPlainObject(raw)) {
+    return { ok: false, error: 'Archive context must be a JSON object.' };
+  }
+
+  const activeChapter =
+    typeof raw.activeChapter === 'string' && VALID_ACTIVE_CHAPTERS.has(raw.activeChapter)
+      ? raw.activeChapter
+      : 'unknown';
+
+  const completion =
+    typeof raw.completionPercentage === 'number' && Number.isFinite(raw.completionPercentage)
+      ? Math.max(0, Math.min(100, Math.round(raw.completionPercentage)))
+      : 0;
+
+  const decisionsRaw = isPlainObject(raw.decisions) ? raw.decisions : {};
   const decisionLines = [1, 2, 3, 4, 5].map((n) => {
-    const val = decisions[`ch${n}`];
-    return `CH 0${n}: ${typeof val === 'string' && val ? val : 'PENDING (not decided yet)'}`;
+    const key = `ch${n}`;
+    const val = decisionsRaw[key];
+    const validSet = VALID_DECISION_VALUES[key];
+    return `CH 0${n}: ${
+      typeof val === 'string' && validSet.has(val) ? val : 'PENDING (not decided yet)'
+    }`;
   });
 
-  const idx =
-    ctx.humanityIndex && typeof ctx.humanityIndex === 'object'
-      ? (ctx.humanityIndex as Record<string, unknown>)
-      : {};
-  const inn = typeof idx.innovation === 'number' ? idx.innovation : 'N/A';
-  const con = typeof idx.connection === 'number' ? idx.connection : 'N/A';
-  const agn = typeof idx.humanAgency === 'number' ? idx.humanAgency : 'N/A';
+  const idx = isPlainObject(raw.humanityIndex) ? raw.humanityIndex : {};
+  const clampMetric = (v: unknown) =>
+    typeof v === 'number' && Number.isFinite(v) ? `${Math.max(0, Math.min(100, Math.round(v)))}%` : 'N/A';
 
-  const inspected = sanitizeStringList(ctx.inspectedArtifacts);
-  const lost = sanitizeStringList(ctx.discoveredLostArtifacts);
-  const repaired = sanitizeStringList(ctx.repairedFiles);
-  const secrets = sanitizeStringList(ctx.unlockedSecrets);
+  const archetypeTitle =
+    typeof raw.archetypeTitle === 'string'
+      ? stripControlChars(raw.archetypeTitle).slice(0, 80) || 'INCOMPLETE'
+      : 'INCOMPLETE';
+  const pathId =
+    typeof raw.pathId === 'string'
+      ? stripControlChars(raw.pathId).slice(0, 64) || 'DRAFT'
+      : 'DRAFT';
 
-  return [
-    `Active Section: ${typeof ctx.activeChapter === 'string' ? ctx.activeChapter.slice(0, 32) : 'unknown'}`,
-    `Archive Completion: ${typeof ctx.completionPercentage === 'number' ? Math.round(ctx.completionPercentage) : 0}%`,
-    `Timeline Status: ${typeof ctx.archetypeTitle === 'string' ? ctx.archetypeTitle.slice(0, 80) : 'INCOMPLETE'} (${typeof ctx.pathId === 'string' ? ctx.pathId.slice(0, 64) : 'DRAFT'})`,
-    `Recorded Choices -> ${decisionLines.join(' | ')}`,
-    `Live Humanity Index -> Innovation: ${inn}%, Connection: ${con}%, Human Agency: ${agn}%`,
-    `Inspected Artifacts (${inspected.length}): ${inspected.length > 0 ? inspected.join(', ') : 'none yet'}`,
-    `Recovered Lost Memories (${lost.length}): ${lost.length > 0 ? lost.join(', ') : 'none yet'}`,
-    `Repaired Corrupted Files (${repaired.length}): ${repaired.length > 0 ? repaired.join(', ') : 'none yet'}`,
-    `Unlocked Secrets (${secrets.length}): ${secrets.length > 0 ? secrets.join(', ') : 'none yet'}`,
-  ].join('\n');
+  const inspected = sanitizeIdList(raw.inspectedArtifacts);
+  const lost = sanitizeIdList(raw.discoveredLostArtifacts);
+  const repaired = sanitizeIdList(raw.repairedFiles);
+  const secrets = sanitizeIdList(raw.unlockedSecrets);
+
+  return {
+    ok: true,
+    block: [
+      `Active Section: ${activeChapter}`,
+      `Archive Completion: ${completion}%`,
+      `Timeline Status: ${archetypeTitle} (${pathId})`,
+      `Recorded Choices -> ${decisionLines.join(' | ')}`,
+      `Live Humanity Index -> Innovation: ${clampMetric(idx.innovation)}, Connection: ${clampMetric(idx.connection)}, Human Agency: ${clampMetric(idx.humanAgency)}`,
+      `Inspected Artifacts (${inspected.length}): ${inspected.length > 0 ? inspected.join(', ') : 'none yet'}`,
+      `Recovered Lost Memories (${lost.length}): ${lost.length > 0 ? lost.join(', ') : 'none yet'}`,
+      `Repaired Corrupted Files (${repaired.length}): ${repaired.length > 0 ? repaired.join(', ') : 'none yet'}`,
+      `Unlocked Secrets (${secrets.length}): ${secrets.length > 0 ? secrets.join(', ') : 'none yet'}`,
+    ].join('\n'),
+  };
+}
+
+export function resolveConfiguredModel(modelOverride?: string): {
+  valid: boolean;
+  modelId: string;
+} {
+  const candidate = (modelOverride ?? process.env.GEMINI_MODEL ?? DEFAULT_ARCHIVIST_MODEL).trim();
+  if (!candidate || !SUPPORTED_GEMINI_MODELS.has(candidate)) {
+    return { valid: false, modelId: candidate || '(empty)' };
+  }
+  return { valid: true, modelId: candidate };
+}
+
+function classifyAndSanitizeGeminiError(err: unknown): ArchivistResult {
+  const record =
+    err && typeof err === 'object' ? (err as { status?: unknown; code?: unknown; message?: unknown }) : {};
+  const numericStatus = typeof record.status === 'number' ? record.status : undefined;
+  const rawMessage = err instanceof Error ? err.message : String(record.message ?? '');
+  const lower = rawMessage.toLowerCase();
+
+  // Log terse diagnostic server-side only (never sent to browser, never includes API key)
+  console.error('[Archivist API Upstream Failure]', {
+    status: numericStatus ?? 'unknown',
+    code: typeof record.code === 'string' ? record.code : 'unknown',
+  });
+
+  if (
+    numericStatus === 429 ||
+    lower.includes('resource_exhausted') ||
+    lower.includes('quota') ||
+    lower.includes('rate limit')
+  ) {
+    return {
+      status: 429,
+      headers: { 'Retry-After': '30' },
+      body: {
+        ok: false,
+        configured: true,
+        code: 'QUOTA_EXCEEDED',
+        retryAfterSeconds: 30,
+        error:
+          'The Archivist AI service has reached its current API quota limit. Please try again in a minute.',
+      },
+    };
+  }
+
+  if (
+    numericStatus === 404 ||
+    lower.includes('not_found') ||
+    (lower.includes('model') &&
+      (lower.includes('not found') ||
+        lower.includes('unsupported') ||
+        lower.includes('not supported') ||
+        lower.includes('unknown')))
+  ) {
+    return {
+      status: 500,
+      body: {
+        ok: false,
+        configured: true,
+        code: 'INVALID_MODEL_CONFIG',
+        error:
+          'The configured Gemini Archivist model is unavailable or unsupported in this API environment.',
+      },
+    };
+  }
+
+  if (
+    numericStatus === 401 ||
+    numericStatus === 403 ||
+    lower.includes('api_key_invalid') ||
+    lower.includes('api key not valid') ||
+    lower.includes('permission_denied') ||
+    lower.includes('unauthenticated')
+  ) {
+    return {
+      status: 503,
+      body: {
+        ok: false,
+        configured: false,
+        code: 'INVALID_API_KEY',
+        error:
+          'The server Gemini API credential could not be authenticated for this service.',
+      },
+    };
+  }
+
+  if (numericStatus === 400) {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        configured: true,
+        code: 'INVALID_REQUEST',
+        error: 'The Archivist query format was rejected by the upstream service. Please rephrase and retry.',
+      },
+    };
+  }
+
+  if (numericStatus === 503 || lower.includes('unavailable') || lower.includes('high demand')) {
+    return {
+      status: 503,
+      headers: { 'Retry-After': '10' },
+      body: {
+        ok: false,
+        configured: true,
+        code: 'UPSTREAM_ERROR',
+        retryAfterSeconds: 10,
+        error: 'The Archivist AI model is experiencing temporary high demand. Please retry in a few seconds.',
+      },
+    };
+  }
+
+  return {
+    status: 502,
+    body: {
+      ok: false,
+      configured: true,
+      code: 'UPSTREAM_ERROR',
+      error: 'Unable to reach the Archivist AI service right now. Please try again shortly.',
+    },
+  };
+}
+
+export interface HandleArchivistOptions {
+  apiKey?: string;
+  modelOverride?: string;
+  clientIp?: string;
+  rateLimiter?: RateLimiter;
+  nowMs?: number;
+  generateContentFn?: (params: {
+    apiKey: string;
+    model: string;
+    contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>;
+    systemInstruction: string;
+  }) => Promise<{ text?: string }>;
 }
 
 export async function handleArchivistRequest(
   payload: ArchivistRequestPayload,
-  apiKey: string | undefined = process.env.GEMINI_API_KEY
+  optionsOrKey?: string | HandleArchivistOptions
 ): Promise<ArchivistResult> {
-  const cleanedKey = (apiKey ?? '').trim();
+  const opts: HandleArchivistOptions =
+    typeof optionsOrKey === 'string'
+      ? { apiKey: optionsOrKey }
+      : optionsOrKey ?? {};
+
+  // 1. Per-IP Rate Limiting
+  if (opts.rateLimiter) {
+    const rate = opts.rateLimiter.check(opts.clientIp ?? '127.0.0.1', opts.nowMs);
+    if (!rate.allowed) {
+      return {
+        status: 429,
+        headers: {
+          'Retry-After': String(rate.retryAfterSeconds),
+          'X-RateLimit-Remaining': '0',
+        },
+        body: {
+          ok: false,
+          configured: true,
+          code: 'RATE_LIMITED',
+          retryAfterSeconds: rate.retryAfterSeconds,
+          error: `Too many Archivist queries from this address. Please wait ${rate.retryAfterSeconds}s before trying again.`,
+        },
+      };
+    }
+  }
+
+  // 2. Payload structure & byte-size validation
+  if (!isPlainObject(payload)) {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        configured: true,
+        code: 'INVALID_REQUEST',
+        error: 'Request body must be a valid JSON object.',
+      },
+    };
+  }
+
+  try {
+    const serializedBytes = Buffer.byteLength(JSON.stringify(payload), 'utf8');
+    if (serializedBytes > MAX_ARCHIVIST_PAYLOAD_BYTES) {
+      return {
+        status: 413,
+        body: {
+          ok: false,
+          configured: true,
+          code: 'PAYLOAD_TOO_LARGE',
+          error: 'Request payload exceeds the 32 KB safety limit.',
+        },
+      };
+    }
+  } catch {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        configured: true,
+        code: 'INVALID_REQUEST',
+        error: 'Request body could not be serialized safely.',
+      },
+    };
+  }
+
+  // 3. Validate question, history, and archiveContext before invoking SDK
+  if (typeof payload.question !== 'string') {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        configured: true,
+        code: 'INVALID_REQUEST',
+        error: 'Please enter a non-empty question for the Archivist.',
+      },
+    };
+  }
+
+  const question = stripControlChars(payload.question);
+  if (!question) {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        configured: true,
+        code: 'INVALID_REQUEST',
+        error: 'Please enter a non-empty question for the Archivist.',
+      },
+    };
+  }
+  if (question.length > MAX_QUESTION_LENGTH) {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        configured: true,
+        code: 'INVALID_REQUEST',
+        error: `Question exceeds the ${MAX_QUESTION_LENGTH} character archive query limit.`,
+      },
+    };
+  }
+
+  const historyResult = validateAndSanitizeHistory(payload.history);
+  if (!historyResult.ok) {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        configured: true,
+        code: 'INVALID_REQUEST',
+        error: historyResult.error,
+      },
+    };
+  }
+
+  const contextResult = formatArchiveContext(payload.archiveContext);
+  if (!contextResult.ok) {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        configured: true,
+        code: 'INVALID_REQUEST',
+        error: contextResult.error,
+      },
+    };
+  }
+
+  // 4. Verify Server API Key & Model Configuration
+  const cleanedKey = (opts.apiKey ?? process.env.GEMINI_API_KEY ?? '').trim();
   if (!cleanedKey || cleanedKey === 'MY_GEMINI_API_KEY') {
     return {
       status: 503,
@@ -145,39 +592,22 @@ export async function handleArchivistRequest(
     };
   }
 
-  if (!payload || typeof payload.question !== 'string') {
+  const modelCheck = resolveConfiguredModel(opts.modelOverride);
+  if (!modelCheck.valid) {
     return {
-      status: 400,
+      status: 500,
       body: {
         ok: false,
         configured: true,
-        code: 'INVALID_REQUEST',
-        error: 'Please enter a non-empty question for the Archivist.',
-      },
-    };
-  }
-
-  const question = payload.question.trim();
-  if (!question || question.length > 1200) {
-    return {
-      status: 400,
-      body: {
-        ok: false,
-        configured: true,
-        code: 'INVALID_REQUEST',
+        code: 'INVALID_MODEL_CONFIG',
         error:
-          question.length > 1200
-            ? 'Question exceeds the 1,200 character archive query limit.'
-            : 'Please enter a non-empty question for the Archivist.',
+          'Archivist AI model configuration is invalid or unsupported by the active Gemini API environment.',
       },
     };
   }
-
-  const history = sanitizeHistory(payload.history);
-  const contextBlock = formatArchiveContext(payload.archiveContext);
 
   const contents = [
-    ...history.map((msg) => ({
+    ...historyResult.history.map((msg) => ({
       role: msg.role,
       parts: [{ text: msg.text }],
     })),
@@ -185,29 +615,41 @@ export async function handleArchivistRequest(
       role: 'user' as const,
       parts: [
         {
-          text: `${contextBlock}\n\nVisitor Question:\n${question}`,
+          text: `${contextResult.block}\n\nVisitor Question:\n${question}`,
         },
       ],
     },
   ];
 
+  // 5. Execute Server-Side Gemini Call (Never fabricate answers on error)
   try {
-    const ai = new GoogleGenAI({
-      apiKey: cleanedKey,
-      httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
-    });
-
-    const response = await ai.models.generateContent({
-      model: MODEL_ID,
-      contents,
-      config: {
+    let answerText: string | undefined;
+    if (opts.generateContentFn) {
+      const mocked = await opts.generateContentFn({
+        apiKey: cleanedKey,
+        model: modelCheck.modelId,
+        contents,
         systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.65,
-        maxOutputTokens: 700,
-      },
-    });
+      });
+      answerText = mocked.text;
+    } else {
+      const ai = new GoogleGenAI({
+        apiKey: cleanedKey,
+        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
+      });
 
-    const answer = response.text?.trim();
+      const response = await ai.models.generateContent({
+        model: modelCheck.modelId,
+        contents,
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+        },
+      });
+      answerText = response.text;
+    }
+
+    const answer = answerText?.trim();
     if (!answer) {
       return {
         status: 502,
@@ -226,19 +668,10 @@ export async function handleArchivistRequest(
         ok: true,
         configured: true,
         answer,
-        model: MODEL_ID,
+        model: modelCheck.modelId,
       },
     };
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unexpected Archivist AI error.';
-    return {
-      status: 502,
-      body: {
-        ok: false,
-        configured: true,
-        code: 'UPSTREAM_ERROR',
-        error: `Archivist transmission interrupted: ${message}`,
-      },
-    };
+    return classifyAndSanitizeGeminiError(err);
   }
 }

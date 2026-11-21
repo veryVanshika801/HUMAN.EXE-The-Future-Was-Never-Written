@@ -156,7 +156,10 @@ export const ChapterSection: React.FC<ChapterSectionProps> = ({
         });
       });
 
-      if (!reducedMotion) {
+      if (reducedMotion) {
+        const revealEls = el.querySelectorAll('.gs-reveal');
+        gsap.set(revealEls, { opacity: 1, y: 0, clearProps: 'transform' });
+      } else {
         const revealEls = el.querySelectorAll('.gs-reveal');
         revealEls.forEach((node) => {
           gsap.fromTo(
@@ -208,7 +211,11 @@ export const ChapterSection: React.FC<ChapterSectionProps> = ({
 
   // Chapter 3 animated terminal boot lines
   useEffect(() => {
-    if (chapter.number !== 3 || reducedMotion) return;
+    if (chapter.number !== 3) return;
+    if (reducedMotion) {
+      setTerminalLinesVisible(5);
+      return;
+    }
     setTerminalLinesVisible(1);
     const id = window.setInterval(() => {
       setTerminalLinesVisible((prev) => {

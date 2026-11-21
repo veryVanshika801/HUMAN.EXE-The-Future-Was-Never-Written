@@ -15,10 +15,10 @@ Created by **Vanshika & Siddhika**.
   - **CH 03 · The Silent Code** (Computing Vault / Animated CRT Terminal, Mainframe Racks, PCB & Processor)
   - **CH 04 · The Connected World** (Interactive 3D Earth Globe, ARPANET / CERN / Subsea Nodes, Cloud & Identity Vaults)
   - **CH 05 · The Age of Machines** (2075 Neural Observatory, Creative Engine, Human Memory Core)
-- **48 Timelines & 5 Convergent 2075 Endings**: Transparent decision lineage (`Selected` vs `Pending` chapters), Humanity Index (Innovation, Connection, Human Agency + archival exploration bonuses), interactive 48-path simulator, print-ready & downloadable Dossier.
+- **48 Timelines & 5 Convergent 2075 Endings**: Transparent decision lineage (`Selected` vs `Pending` chapters), Humanity Index (Innovation, Connection, Human Agency + archival exploration bonuses), interactive 48-path simulator, print-ready & downloadable offline HTML Dossier (plus TXT export).
 - **Lost Memories, Corrupted Files & Secret Archives**: Hidden 3D discoveries, multi-fragment file reconstruction lab, cross-era clues in the Archivist's Journal, and `localStorage`-persisted state with schema validation.
 - **Spatial Web Audio Engine**: Procedural ambient synths, mechanical SFX, and optional Web Speech narration with 4-channel mixer and zero forced autoplay on page reload.
-- **2075 Archivist AI Assistant**: Server-side Gemini endpoint (`POST /api/archivist`) grounded in your active decisions, discoveries, and Humanity Index, separating historical facts from 2075 speculative fiction.
+- **2075 Archivist AI Assistant**: Server-side Gemini endpoint (`POST /api/archivist`) with per-IP rate limiting, strict payload validation, and sanitized errors, grounded in your active decisions, discoveries, and Humanity Index.
 
 ---
 
