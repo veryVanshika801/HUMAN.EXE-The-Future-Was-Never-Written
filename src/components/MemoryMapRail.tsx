@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Flame, Cog, Cpu, Globe, Sparkles, Compass, X, Check, Lock, KeyRound } from 'lucide-react';
 import { CHAPTERS } from '../data/chapters';
 import { ARTIFACTS, CORRUPTED_FILES, LOST_ARTIFACTS, SECRET_MEMORIES } from '../data/artifacts';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
 import { ArtifactItem, ChapterId, ChapterNumber, DecisionsState, PathOutcome } from '../types/archive';
 
 interface MemoryMapRailProps {
@@ -48,6 +49,7 @@ export const MemoryMapRail: React.FC<MemoryMapRailProps> = ({
   onNavigateArtifact,
 }) => {
   const [hoveredNode, setHoveredNode] = useState<ChapterNumber | 6 | null>(null);
+  const modalPanelRef = useRef<HTMLDivElement | null>(null);
 
   const lineFillPercent = completionPercentage;
 
@@ -56,14 +58,7 @@ export const MemoryMapRail: React.FC<MemoryMapRailProps> = ({
     return visitedChapters.includes(num) || Boolean(decisions[`ch${num - 1}` as keyof DecisionsState]);
   };
 
-  useEffect(() => {
-    if (!isModalOpen) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseModal();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isModalOpen, onCloseModal]);
+  useDialogAccessibility(isModalOpen, onCloseModal, modalPanelRef);
 
   return (
     <>
@@ -191,8 +186,10 @@ export const MemoryMapRail: React.FC<MemoryMapRailProps> = ({
           className="no-print fixed inset-0 z-50 bg-[#090B0D]/95 flex items-center justify-center p-4 sm:p-8 overflow-y-auto"
         >
           <div
+            ref={modalPanelRef}
+            tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
-            className="modal-reveal w-full max-w-6xl bg-[#111619] border border-white/12 rounded-xl p-6 sm:p-8 my-auto max-h-[92vh] overflow-y-auto"
+            className="modal-reveal w-full max-w-6xl bg-[#111619] border border-white/12 rounded-xl p-6 sm:p-8 my-auto max-h-[92vh] overflow-y-auto focus:outline-none"
           >
             <div className="flex items-start justify-between gap-4 pb-5 border-b border-white/10">
               <div>

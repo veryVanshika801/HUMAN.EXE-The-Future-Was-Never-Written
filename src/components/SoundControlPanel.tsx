@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Volume2, VolumeX, SlidersHorizontal, X, Mic, MicOff } from 'lucide-react';
 import { AudioSettings } from '../types/archive';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
 
 interface SoundControlPanelProps {
   isOpen: boolean;
@@ -15,6 +16,9 @@ export const SoundControlPanel: React.FC<SoundControlPanelProps> = ({
   onClose,
   onUpdateAudio,
 }) => {
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  useDialogAccessibility(isOpen, onClose, panelRef, { lockScroll: false });
+
   if (!isOpen) return null;
 
   const sliders: Array<{
@@ -30,9 +34,11 @@ export const SoundControlPanel: React.FC<SoundControlPanelProps> = ({
 
   return (
     <div
+      ref={panelRef}
+      tabIndex={-1}
       role="dialog"
       aria-label="Archive Sound Mixer"
-      className="no-print fixed top-16 right-4 sm:right-8 z-50 w-72 sm:w-80 bg-[#111619] border border-white/15 rounded-xl p-5 shadow-2xl"
+      className="no-print fixed top-16 right-4 sm:right-8 z-50 w-72 sm:w-80 bg-[#111619] border border-white/15 rounded-xl p-5 shadow-2xl focus:outline-none"
     >
       <div className="flex items-center justify-between pb-3 border-b border-white/10">
         <div className="flex items-center gap-2 text-xs font-mono-archival text-[#A6C7A9] uppercase tracking-wider">

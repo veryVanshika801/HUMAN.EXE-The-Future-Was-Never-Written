@@ -25,6 +25,7 @@ import { EndingSection } from './components/EndingSection';
 import { CreditsSection } from './components/CreditsSection';
 import { SoundControlPanel } from './components/SoundControlPanel';
 import { CustomCursor } from './components/CustomCursor';
+import { ArchivistModal } from './components/ArchivistModal';
 
 const LazyArchiveCanvas = lazy(() => import('./scenes/ArchiveCanvas'));
 
@@ -64,6 +65,7 @@ export function App() {
   const [memoryMapOpen, setMemoryMapOpen] = useState(false);
   const [collectionOpen, setCollectionOpen] = useState(false);
   const [soundPanelOpen, setSoundPanelOpen] = useState(false);
+  const [archivistOpen, setArchivistOpen] = useState(false);
 
   const [activatedGearStage, setActivatedGearStage] = useState(1);
   const [selectedGlobeNodeId, setSelectedGlobeNodeId] = useState<string | null>('node-cern');
@@ -365,6 +367,8 @@ export function App() {
 
       {/* Minimal Top Bar */}
       <TopNav
+        activeChapter={activeChapter}
+        decisions={state.decisions}
         completionPercentage={completionPercentage}
         soundEnabled={state.soundEnabled}
         soundPanelOpen={soundPanelOpen}
@@ -374,6 +378,8 @@ export function App() {
         onToggleReducedMotion={toggleReducedMotion}
         onOpenMemoryMap={() => setMemoryMapOpen(true)}
         onOpenArchiveLog={() => setCollectionOpen(true)}
+        onOpenArchivist={() => setArchivistOpen(true)}
+        onNavigateChapter={navigateToChapter}
         onJumpToTop={() => navigateToChapter('intro')}
         onJumpToEnding={() => navigateToChapter('ending')}
       />
@@ -458,6 +464,7 @@ export function App() {
           allDecisionsMade={allDecisionsMade}
           onNavigateChapter={navigateToChapter}
           onReplay={handleReplay}
+          onOpenArchivist={() => setArchivistOpen(true)}
         />
 
         <CreditsSection
@@ -497,6 +504,15 @@ export function App() {
         }}
         onRepairFile={handleRepairFile}
         onNavigateChapter={navigateToChapter}
+      />
+
+      <ArchivistModal
+        isOpen={archivistOpen}
+        activeChapter={activeChapter}
+        state={state}
+        outcome={endingOutcome}
+        completionPercentage={completionPercentage}
+        onClose={() => setArchivistOpen(false)}
       />
 
       {/* Archivist's Custom Cursor (Auto-disables on touch/reduced motion) */}

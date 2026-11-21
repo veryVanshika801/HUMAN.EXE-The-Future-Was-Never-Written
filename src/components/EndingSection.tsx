@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   Download,
   Printer,
@@ -7,6 +7,9 @@ import {
   X,
   ArrowUpRight,
   Activity,
+  Bot,
+  AlertTriangle,
+  Trash2,
 } from 'lucide-react';
 import {
   ArchiveProgressState,
@@ -22,6 +25,7 @@ import {
   getAll48PathsSummary,
   resolvePathOutcome,
 } from '../logic/decisionEngine';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
 
 interface EndingSectionProps {
   state: ArchiveProgressState;
@@ -30,6 +34,7 @@ interface EndingSectionProps {
   allDecisionsMade: boolean;
   onNavigateChapter: (id: ChapterId) => void;
   onReplay: (keepCollection: boolean) => void;
+  onOpenArchivist: () => void;
 }
 
 interface RadialGaugeProps {
@@ -53,7 +58,14 @@ const RadialHumanityGauge: React.FC<RadialGaugeProps> = ({
 
   return (
     <div className="p-4 rounded-xl bg-[#090B0D] border border-white/10 flex items-center gap-4">
-      <svg width="88" height="88" viewBox="0 0 88 88" className="shrink-0" role="img" aria-label={`${label}: ${value}%`}>
+      <svg
+        width="88"
+        height="88"
+        viewBox="0 0 88 88"
+        className="shrink-0"
+        role="img"
+        aria-label={`${label}: ${value}%`}
+      >
         <circle
           cx="44"
           cy="44"
@@ -110,8 +122,10 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
   allDecisionsMade,
   onNavigateChapter,
   onReplay,
+  onOpenArchivist,
 }) => {
   const [compareOpen, setCompareOpen] = useState(false);
+  const [confirmFullReset, setConfirmFullReset] = useState(false);
   const [archetypeFilter, setArchetypeFilter] = useState<EndingArchetype | 'all'>('all');
   const [simDecisions, setSimDecisions] = useState<Required<DecisionsState>>({
     ch1: state.decisions.ch1 ?? 'share',
@@ -121,19 +135,13 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
     ch5: state.decisions.ch5 ?? 'collaborate',
   });
 
+  const compareDialogRef = useRef<HTMLDivElement | null>(null);
+  useDialogAccessibility(compareOpen, () => setCompareOpen(false), compareDialogRef);
+
   const humanityIndex = useMemo(
     () => calculateLiveHumanityIndex(state.decisions, state),
     [state]
   );
-
-  useEffect(() => {
-    if (!compareOpen) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setCompareOpen(false);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [compareOpen]);
 
   const all48Paths = useMemo(() => getAll48PathsSummary(), []);
   const filtered48Paths = useMemo(
@@ -145,37 +153,77 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
   );
   const simulatedOutcome = useMemo(() => resolvePathOutcome(simDecisions), [simDecisions]);
 
+  const inspectedItems = useMemo(
+    () => ARTIFACTS.filter((a) => state.inspectedArtifacts.includes(a.id)),
+    [state.inspectedArtifacts]
+  );
+  const lostItems = useMemo(
+    () => LOST_ARTIFACTS.filter((l) => state.discoveredLostArtifacts.includes(l.id)),
+    [state.discoveredLostArtifacts]
+  );
+  const repairedItems = useMemo(
+    () => CORRUPTED_FILES.filter((f) => state.repairedFiles.includes(f.id)),
+    [state.repairedFiles]
+  );
+  const secretItems = useMemo(
+    () => SECRET_MEMORIES.filter((s) => state.unlockedSecrets.includes(s.id)),
+    [state.unlockedSecrets]
+  );
+
+  const openCompareExplorer = () => {
+    setSimDecisions({
+      ch1: state.decisions.ch1 ?? 'share',
+      ch2: state.decisions.ch2 ?? 'purpose',
+      ch3: state.decisions.ch3 ?? 'open',
+      ch4: state.decisions.ch4 ?? 'digital_privacy',
+      ch5: state.decisions.ch5 ?? 'collaborate',
+    });
+    setCompareOpen(true);
+  };
+
   const handleDownloadReport = () => {
+    const decisionLines = CHAPTERS.map((ch) => {
+      const factor = humanityIndex.decisionFactorsByChapter[ch.number];
+      if (factor.status === 'pending') {
+        return `- CH 0${ch.number} (${ch.title}): PENDING — Not decided yet`;
+      }
+      const d = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
+      return `- CH 0${ch.number} (${ch.title}): ${factor.optionLabel} [INN ${d(factor.innovationDelta)}, CON ${d(factor.connectionDelta)}, AGN ${d(factor.agencyDelta)}]`;
+    });
+
     const lines = [
-      'HUMAN.EXE — ARCHIVIST FINAL REPORT (2075)',
-      '========================================',
-      `Archive Path ID: ${outcome.pathId}`,
-      `Path Index: ${outcome.pathIndex} / 48`,
-      `Ending Archetype: ${outcome.archetypeTitle}`,
+      'HUMAN.EXE — ARCHIVIST OFFICIAL DOSSIER (2075)',
+      '=============================================',
+      `Status: ${outcome.isComplete ? `FINALIZED ARCHIVE RECORD (${outcome.pathIndex} / 48)` : `DRAFT TELEMETRY (${outcome.selectedCount} / 5 DECISIONS RECORDED)`}`,
+      `Archive Profile ID: ${outcome.pathId}`,
+      `Decision Signature: ${outcome.signature}`,
+      `Classification: ${outcome.archetypeTitle}`,
       `Path Title: ${outcome.pathTitle}`,
+      `Overall Archive Completion: ${completionPercentage}%`,
       '',
-      'HUMANITY INDEX',
-      `- Innovation: ${humanityIndex.innovation}%`,
-      `- Connection: ${humanityIndex.connection}%`,
-      `- Human Agency: ${humanityIndex.humanAgency}%`,
-      `- Composite Balance: ${humanityIndex.overallScore}%`,
+      '1. RECORDED CHAPTER DECISIONS',
+      ...decisionLines,
       '',
-      'HISTORICAL SUMMARY',
+      '2. HUMANITY INDEX BREAKDOWN',
+      `- Baseline Calibration: Innovation ${humanityIndex.baselineScores.innovation}%, Connection ${humanityIndex.baselineScores.connection}%, Human Agency ${humanityIndex.baselineScores.humanAgency}%`,
+      `- Exploration Bonuses: Innovation +${humanityIndex.explorationBonuses.innovation}% (${state.inspectedArtifacts.length} artifacts), Connection +${humanityIndex.explorationBonuses.connection}% (${state.discoveredLostArtifacts.length} lost memories, ${state.unlockedSecrets.length} secrets), Agency +${humanityIndex.explorationBonuses.humanAgency}% (${state.repairedFiles.length} repaired files)`,
+      `- Composite Result -> Innovation: ${humanityIndex.innovation}% | Connection: ${humanityIndex.connection}% | Human Agency: ${humanityIndex.humanAgency}% | Overall Balance: ${humanityIndex.overallScore}%`,
+      '',
+      '3. NARRATIVE SYNTHESIS',
       outcome.historicalSummary,
       '',
-      '2075 PROJECTION',
       outcome.futureDescription,
       '',
-      'FINAL ARCHIVE MESSAGE',
       outcome.finalArchiveMessage,
       '',
-      `Completion: ${completionPercentage}%`,
-      `Era Artifacts Inspected: ${state.inspectedArtifacts.length}/${ARTIFACTS.length}`,
-      `Lost Memories Discovered: ${state.discoveredLostArtifacts.length}/${LOST_ARTIFACTS.length}`,
-      `Corrupted Files Repaired: ${state.repairedFiles.length}/${CORRUPTED_FILES.length}`,
-      `Secret Archives Unlocked: ${state.unlockedSecrets.length}/${SECRET_MEMORIES.length}`,
+      `4. RECOVERED EXHIBITS & FILES`,
+      `Artifacts Inspected (${inspectedItems.length}/${ARTIFACTS.length}): ${inspectedItems.length > 0 ? inspectedItems.map((a) => `${a.accessionCode} ${a.name}`).join('; ') : 'None inspected yet'}`,
+      `Lost Memories Discovered (${lostItems.length}/${LOST_ARTIFACTS.length}): ${lostItems.length > 0 ? lostItems.map((l) => `${l.memoryCode} ${l.title}`).join('; ') : 'None recovered yet'}`,
+      `Corrupted Files Repaired (${repairedItems.length}/${CORRUPTED_FILES.length}): ${repairedItems.length > 0 ? repairedItems.map((f) => f.filename).join('; ') : 'None repaired yet'}`,
+      `Secret Archives Unlocked (${secretItems.length}/${SECRET_MEMORIES.length}): ${secretItems.length > 0 ? secretItems.map((s) => `${s.code} ${s.title}`).join('; ') : 'None unlocked yet'}`,
       '',
       'Technology is what we build. The future is what we choose.',
+      'HUMAN.EXE — Digital Archaeology Museum',
     ];
     const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -198,8 +246,16 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
         {/* Ending Archetype Reveal */}
         <div className="print-report bg-[#090B0D]/92 border border-white/15 rounded-xl p-6 sm:p-10">
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono-archival text-[#A6C7A9]">
-            <span>ARCHIVE CORE · YEAR 2075 SIMULATION · 5 CONVERGENT FUTURES</span>
-            <span>PATH {String(outcome.pathIndex).padStart(2, '0')} OF 48</span>
+            <span>
+              {outcome.isComplete
+                ? 'ARCHIVE CORE · YEAR 2075 SIMULATION · SEALED OUTCOME'
+                : `ARCHIVE CORE · DRAFT TELEMETRY · ${outcome.selectedCount}/5 DECISIONS LOCKED`}
+            </span>
+            <span>
+              {outcome.isComplete
+                ? `PATH ${String(outcome.pathIndex).padStart(2, '0')} OF 48`
+                : `PENDING: ${outcome.pendingChapters.length} CHAPTER${outcome.pendingChapters.length === 1 ? '' : 'S'}`}
+            </span>
           </div>
 
           <h2
@@ -213,8 +269,34 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
           </div>
 
           {!allDecisionsMade && (
-            <div className="mt-4 p-3.5 rounded-lg bg-[#1A130F] border border-[#D9822B]/45 text-xs text-[#D9822B]">
-              Some earlier chapter decisions were defaulted. Revisit any chapter in the Memory Map to lock in all five choices.
+            <div
+              role="status"
+              className="mt-5 p-4 rounded-lg bg-[#1A130F] border border-[#D9822B]/55 space-y-3"
+            >
+              <div className="flex items-start gap-2.5 text-xs text-[#F6B26B]">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+                <div>
+                  <div className="font-mono-archival font-semibold uppercase tracking-wider">
+                    Incomplete Historical Record ({outcome.selectedCount} of 5 Decisions Recorded)
+                  </div>
+                  <p className="text-[#F0F2F2]/85 mt-1 leading-relaxed">
+                    Your 2075 ending cannot be finalized until every historical chapter has a deliberate choice. Undecided chapters are excluded from your Humanity Index rather than filled with fake defaults.
+                  </p>
+                </div>
+              </div>
+              <div className="no-print flex flex-wrap gap-2">
+                {outcome.pendingChapters.map((chNum) => (
+                  <button
+                    key={chNum}
+                    type="button"
+                    onClick={() => onNavigateChapter(`ch${chNum}` as ChapterId)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#090B0D] border border-[#D9822B]/60 hover:border-[#F6B26B] text-[11px] font-mono-archival text-[#F6B26B] cursor-pointer transition-colors"
+                  >
+                    <span>Decide in CH 0{chNum}</span>
+                    <ArrowUpRight className="w-3 h-3" aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -234,7 +316,7 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
           <div className="flex flex-wrap items-start justify-between gap-4 pb-5 border-b border-white/10">
             <div>
               <div className="inline-flex items-center gap-1.5 text-xs font-mono-archival text-[#A6C7A9]">
-                <Activity className="w-3.5 h-3.5" />
+                <Activity className="w-3.5 h-3.5" aria-hidden="true" />
                 <span>THE HUMANITY INDEX · ARCHIVE PROFILE {outcome.pathId}</span>
               </div>
               <h3 className="font-display text-2xl font-semibold text-[#F0F2F2] mt-1">
@@ -245,7 +327,9 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
               </div>
             </div>
             <div className="text-right font-mono-archival">
-              <div className="text-2xl font-semibold text-[#F0F2F2] tabular-nums">{completionPercentage}%</div>
+              <div className="text-2xl font-semibold text-[#F0F2F2] tabular-nums">
+                {completionPercentage}%
+              </div>
               <div className="text-[11px] text-[#899398]">Archive Completion</div>
             </div>
           </div>
@@ -254,63 +338,90 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
           <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
             <RadialHumanityGauge
               label="INNOVATION"
-              subtitle="Technological momentum & artifacts examined"
+              subtitle={`Baseline ${humanityIndex.baselineScores.innovation}% + decisions & artifacts`}
               value={humanityIndex.innovation}
               bonus={humanityIndex.explorationBonuses.innovation}
               strokeHex="#D9822B"
             />
             <RadialHumanityGauge
               label="CONNECTION"
-              subtitle="Shared culture, openness & recovered memories"
+              subtitle={`Baseline ${humanityIndex.baselineScores.connection}% + decisions & memories`}
               value={humanityIndex.connection}
               bonus={humanityIndex.explorationBonuses.connection}
               strokeHex="#BFC7CB"
             />
             <RadialHumanityGauge
               label="HUMAN AGENCY"
-              subtitle="Mortal autonomy, purpose & repaired records"
+              subtitle={`Baseline ${humanityIndex.baselineScores.humanAgency}% + decisions & repaired files`}
               value={humanityIndex.humanAgency}
               bonus={humanityIndex.explorationBonuses.humanAgency}
               strokeHex="#A6C7A9"
             />
           </div>
 
-          {/* Butterfly Effect Per-Decision Attribution Breakdown */}
+          {/* Butterfly Effect Per-Decision Attribution Breakdown (Strictly Keyed by Chapter Number) */}
           <div className="mt-6 pt-5 border-t border-white/10">
             <div className="text-xs font-mono-archival text-[#899398] uppercase tracking-wider mb-3">
               Butterfly Effect · Decision Lineage &amp; Index Deltas
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
-              {CHAPTERS.map((ch, idx) => {
-                const factor = humanityIndex.decisionFactors[idx];
-                const val = state.decisions[ch.id];
-                const opt = ch.options.find((o) => o.value === val);
+              {CHAPTERS.map((ch) => {
+                const factor = humanityIndex.decisionFactorsByChapter[ch.number];
+                const isSelected = factor.status === 'selected';
+                const memoryTag = outcome.unlockedMemoriesByChapter[ch.number];
                 return (
                   <button
                     key={ch.id}
                     type="button"
                     onClick={() => onNavigateChapter(ch.id)}
-                    className="museum-card-hover text-left p-3 rounded-lg bg-[#090B0D] border border-white/10 hover:border-[#A6C7A9]/60 cursor-pointer flex flex-col justify-between gap-2"
+                    className={`museum-card-hover text-left p-3 rounded-lg border cursor-pointer flex flex-col justify-between gap-2 ${
+                      isSelected
+                        ? 'bg-[#090B0D] border-white/15 hover:border-[#A6C7A9]/60'
+                        : 'bg-[#0D0B09] border-dashed border-[#D9822B]/40 hover:border-[#D9822B]'
+                    }`}
                   >
                     <div>
                       <div className="flex items-center justify-between text-[11px] font-mono-archival text-[#899398]">
                         <span>CH 0{ch.number}</span>
-                        <ArrowUpRight className="w-3 h-3" />
+                        <ArrowUpRight className="w-3 h-3" aria-hidden="true" />
                       </div>
-                      <div className="text-xs font-medium text-[#F0F2F2] mt-1">
-                        {opt ? opt.label : factor?.optionLabel ?? 'Defaulted'}
+                      <div
+                        className={`text-xs font-medium mt-1 ${
+                          isSelected ? 'text-[#F0F2F2]' : 'text-[#D9822B]'
+                        }`}
+                      >
+                        {isSelected ? factor.optionLabel : 'Pending Choice'}
                       </div>
                       <div className="text-[10px] text-[#A6C7A9] mt-1 truncate">
-                        {outcome.unlockedMemories[idx]}
+                        {memoryTag ?? 'Visit era to decide'}
                       </div>
                     </div>
-                    {factor && (
+                    {isSelected ? (
                       <div className="pt-2 border-t border-white/8 text-[10px] font-mono-archival text-[#899398] space-x-1.5">
-                        <span>INN {factor.innovationDelta >= 0 ? `+${factor.innovationDelta}` : factor.innovationDelta}</span>
+                        <span>
+                          INN{' '}
+                          {factor.innovationDelta >= 0
+                            ? `+${factor.innovationDelta}`
+                            : factor.innovationDelta}
+                        </span>
                         <span>·</span>
-                        <span>CON {factor.connectionDelta >= 0 ? `+${factor.connectionDelta}` : factor.connectionDelta}</span>
+                        <span>
+                          CON{' '}
+                          {factor.connectionDelta >= 0
+                            ? `+${factor.connectionDelta}`
+                            : factor.connectionDelta}
+                        </span>
                         <span>·</span>
-                        <span>AGN {factor.agencyDelta >= 0 ? `+${factor.agencyDelta}` : factor.agencyDelta}</span>
+                        <span>
+                          AGN{' '}
+                          {factor.agencyDelta >= 0
+                            ? `+${factor.agencyDelta}`
+                            : factor.agencyDelta}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="pt-2 border-t border-white/8 text-[10px] font-mono-archival text-[#899398]">
+                        Awaiting Decision
                       </div>
                     )}
                   </button>
@@ -319,36 +430,94 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
             </div>
           </div>
 
-          {/* Artifact, File & Secret Summary */}
+          {/* Artifact, File & Secret Summary + Print-Visible Itemized Dossier */}
           <dl className="mt-6 pt-5 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center font-mono-archival">
             <div>
               <dt className="text-[11px] text-[#899398]">Lost Artifacts</dt>
-              <dd className="text-lg text-[#F0F2F2] mt-0.5">{state.discoveredLostArtifacts.length} / {LOST_ARTIFACTS.length}</dd>
+              <dd className="text-lg text-[#F0F2F2] mt-0.5">
+                {state.discoveredLostArtifacts.length} / {LOST_ARTIFACTS.length}
+              </dd>
             </div>
             <div>
               <dt className="text-[11px] text-[#899398]">Repaired Files</dt>
-              <dd className="text-lg text-[#F0F2F2] mt-0.5">{state.repairedFiles.length} / {CORRUPTED_FILES.length}</dd>
+              <dd className="text-lg text-[#F0F2F2] mt-0.5">
+                {state.repairedFiles.length} / {CORRUPTED_FILES.length}
+              </dd>
             </div>
             <div>
               <dt className="text-[11px] text-[#899398]">Era Artifacts</dt>
-              <dd className="text-lg text-[#F0F2F2] mt-0.5">{state.inspectedArtifacts.length} / {ARTIFACTS.length}</dd>
+              <dd className="text-lg text-[#F0F2F2] mt-0.5">
+                {state.inspectedArtifacts.length} / {ARTIFACTS.length}
+              </dd>
             </div>
             <div>
               <dt className="text-[11px] text-[#899398]">Secret Archives</dt>
-              <dd className="text-lg text-[#A6C7A9] mt-0.5">{state.unlockedSecrets.length} / {SECRET_MEMORIES.length}</dd>
+              <dd className="text-lg text-[#A6C7A9] mt-0.5">
+                {state.unlockedSecrets.length} / {SECRET_MEMORIES.length}
+              </dd>
             </div>
           </dl>
+
+          {/* Itemized Discovery Ledger (especially valuable in Print / PDF Dossier) */}
+          <div className="mt-5 pt-4 border-t border-white/10 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div className="p-3.5 rounded-lg bg-[#090B0D] border border-white/10">
+              <div className="font-mono-archival text-[10px] text-[#A6C7A9] uppercase tracking-wider mb-1.5">
+                Inspected Artifacts ({inspectedItems.length}/{ARTIFACTS.length})
+              </div>
+              <p className="text-[#BFC7CB] leading-relaxed">
+                {inspectedItems.length > 0
+                  ? inspectedItems.map((a) => `${a.name} (${a.accessionCode})`).join(' · ')
+                  : 'No 3D artifacts inspected yet.'}
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-lg bg-[#090B0D] border border-white/10 space-y-2">
+              <div>
+                <div className="font-mono-archival text-[10px] text-[#D9822B] uppercase tracking-wider">
+                  Lost Memories &amp; Files ({lostItems.length + repairedItems.length}/
+                  {LOST_ARTIFACTS.length + CORRUPTED_FILES.length})
+                </div>
+                <p className="text-[#BFC7CB] mt-1 leading-relaxed">
+                  {lostItems.length + repairedItems.length > 0
+                    ? [
+                        ...lostItems.map((l) => `${l.memoryCode}: ${l.title}`),
+                        ...repairedItems.map((f) => f.filename),
+                      ].join(' · ')
+                    : 'No lost memories or corrupted files recovered yet.'}
+                </p>
+              </div>
+              {secretItems.length > 0 && (
+                <div>
+                  <div className="font-mono-archival text-[10px] text-[#A6C7A9] uppercase tracking-wider">
+                    Secrets Unlocked ({secretItems.length}/{SECRET_MEMORIES.length})
+                  </div>
+                  <p className="text-[#BFC7CB] mt-0.5 leading-relaxed">
+                    {secretItems.map((s) => `${s.code}: ${s.title}`).join(' · ')}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Actions */}
           <div className="no-print mt-6 pt-5 border-t border-white/10 flex flex-wrap items-center gap-3">
             <button
               type="button"
               data-magnetic="true"
-              onClick={() => setCompareOpen(true)}
+              onClick={openCompareExplorer}
               className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-medium bg-[#F0F2F2] hover:bg-[#A6C7A9] text-[#090B0D] rounded transition-colors cursor-pointer whitespace-nowrap"
             >
               <GitCompare className="w-4 h-4" aria-hidden="true" />
               <span>Explore 48 Paths &amp; 5 Endings</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenArchivist}
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-medium bg-[#121D17] border border-[#A6C7A9]/50 hover:border-[#A6C7A9] text-[#A6C7A9] rounded transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <Bot className="w-4 h-4" aria-hidden="true" />
+              <span>Discuss Outcome with Archivist AI</span>
             </button>
 
             <button
@@ -372,12 +541,47 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
             <button
               type="button"
               data-magnetic="true"
-              onClick={() => onReplay(true)}
+              onClick={() => {
+                setConfirmFullReset(false);
+                onReplay(true);
+              }}
               className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-medium bg-[#090B0D] border border-[#D9822B]/50 hover:border-[#D9822B] text-[#D9822B] rounded transition-colors cursor-pointer whitespace-nowrap"
             >
               <RotateCcw className="w-4 h-4" aria-hidden="true" />
               <span>Replay Choices (Keep Discoveries)</span>
             </button>
+
+            {!confirmFullReset ? (
+              <button
+                type="button"
+                onClick={() => setConfirmFullReset(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2.5 text-xs font-mono-archival text-[#899398] hover:text-[#C95D3A] border border-white/10 hover:border-[#C95D3A]/50 rounded transition-colors cursor-pointer whitespace-nowrap"
+              >
+                <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Full Reset</span>
+              </button>
+            ) : (
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-[#1A100E] border border-[#C95D3A]/60 text-xs">
+                <span className="text-[#C95D3A] font-mono-archival">Erase all discoveries?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmFullReset(false);
+                    onReplay(false);
+                  }}
+                  className="px-2 py-1 rounded bg-[#C95D3A] text-[#090B0D] font-semibold cursor-pointer"
+                >
+                  Confirm
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmFullReset(false)}
+                  className="px-2 py-1 rounded border border-white/15 text-[#BFC7CB] cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -402,7 +606,9 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
           onClick={() => setCompareOpen(false)}
         >
           <div
-            className="modal-reveal w-full max-w-5xl bg-[#111619] border border-white/15 rounded-xl p-6 sm:p-8 my-auto max-h-[90vh] overflow-y-auto"
+            ref={compareDialogRef}
+            tabIndex={-1}
+            className="modal-reveal w-full max-w-5xl bg-[#111619] border border-white/15 rounded-xl p-6 sm:p-8 my-auto max-h-[90vh] overflow-y-auto focus:outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4 pb-5 border-b border-white/10">
@@ -410,7 +616,10 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
                 <div className="text-xs font-mono-archival text-[#A6C7A9]">
                   BRANCHING DECISION ENGINE · 48 TIMELINES · 5 ENDINGS
                 </div>
-                <h2 id="compare-paths-title" className="font-display text-2xl font-semibold text-[#F0F2F2] mt-1">
+                <h2
+                  id="compare-paths-title"
+                  className="font-display text-2xl font-semibold text-[#F0F2F2] mt-1"
+                >
                   Compare Decisions &amp; Explore All 48 Timelines
                 </h2>
               </div>
@@ -462,7 +671,8 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
               <div className="p-5 rounded-xl bg-[#090B0D] border border-[#A6C7A9]/40 flex flex-col justify-between gap-4">
                 <div>
                   <div className="text-xs font-mono-archival text-[#A6C7A9]">
-                    SIMULATED PATH {String(simulatedOutcome.pathIndex).padStart(2, '0')} / 48 · {simulatedOutcome.pathId}
+                    SIMULATED PATH {String(simulatedOutcome.pathIndex).padStart(2, '0')} / 48 ·{' '}
+                    {simulatedOutcome.pathId}
                   </div>
                   <h3 className="font-display text-2xl font-semibold text-[#F0F2F2] mt-2">
                     {simulatedOutcome.archetypeTitle}
@@ -527,7 +737,7 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
                 {filtered48Paths.map((p) => {
-                  const isCurrentReal = p.pathIndex === outcome.pathIndex;
+                  const isCurrentReal = outcome.isComplete && p.pathIndex === outcome.pathIndex;
                   const isSim = p.pathIndex === simulatedOutcome.pathIndex;
                   return (
                     <button
@@ -543,7 +753,10 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
                       }`}
                     >
                       <div className="flex items-center justify-between font-mono-archival text-[10px] text-[#899398]">
-                        <span>#{String(p.pathIndex).padStart(2, '0')} · {p.archetype.replace('_', ' ').toUpperCase()}</span>
+                        <span>
+                          #{String(p.pathIndex).padStart(2, '0')} ·{' '}
+                          {p.archetype.replace('_', ' ').toUpperCase()}
+                        </span>
                         {isCurrentReal && <span className="text-[#A6C7A9]">YOURS</span>}
                       </div>
                       <div className="text-[#F0F2F2] font-medium truncate mt-0.5">{p.pathTitle}</div>

@@ -179,6 +179,8 @@ export interface GearStageData {
 
 export interface DecisionImpactDelta {
   chapter: ChapterNumber;
+  status: 'selected' | 'pending';
+  optionValue?: string;
   optionLabel: string;
   innovationDelta: number;
   connectionDelta: number;
@@ -190,9 +192,14 @@ export interface InfluenceScores {
   connection: number;
   humanAgency: number;
   decisionFactors: DecisionImpactDelta[];
+  decisionFactorsByChapter: Record<ChapterNumber, DecisionImpactDelta>;
 }
 
 export interface PathOutcome {
+  isComplete: boolean;
+  selectedCount: number;
+  pendingChapters: ChapterNumber[];
+  actualDecisions: DecisionsState;
   pathIndex: number;
   pathId: string;
   signature: string;
@@ -204,6 +211,7 @@ export interface PathOutcome {
   finalArchiveMessage: string;
   historicalSummary: string;
   unlockedMemories: string[];
+  unlockedMemoriesByChapter: Record<ChapterNumber, string | null>;
   visualVariation: {
     label: string;
     skyHue: string;
@@ -225,6 +233,7 @@ export interface ArchiveProgressState {
   repairedFiles: string[];
   unlockedSecrets: string[];
   unlockedClues?: string[];
+  visitedTerminalCode?: boolean;
   eventLog: ArchiveEvent[];
   audio: AudioSettings;
   soundEnabled: boolean;

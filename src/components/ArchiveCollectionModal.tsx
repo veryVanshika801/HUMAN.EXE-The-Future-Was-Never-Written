@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   X,
   Compass,
@@ -14,6 +14,7 @@ import {
 import { ARTIFACTS, CORRUPTED_FILES, LOST_ARTIFACTS, SECRET_MEMORIES } from '../data/artifacts';
 import { CHAPTERS } from '../data/chapters';
 import { JOURNAL_CLUES } from '../hooks/useArchiveState';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
 import { ArchiveProgressState, ArtifactItem, ChapterId, ChapterNumber } from '../types/archive';
 import { CorruptedFilesPanel } from './CorruptedFilesPanel';
 
@@ -39,15 +40,9 @@ export const ArchiveCollectionModal: React.FC<ArchiveCollectionModalProps> = ({
   const [tab, setTab] = useState<'journal' | 'lost' | 'artifacts' | 'files' | 'secrets' | 'events'>('journal');
   const [chapterFilter, setChapterFilter] = useState<ChapterNumber | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const modalPanelRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, onClose]);
+  useDialogAccessibility(isOpen, onClose, modalPanelRef);
 
   const q = searchQuery.trim().toLowerCase();
   const unlockedClues = state.unlockedClues ?? [];
@@ -147,7 +142,9 @@ export const ArchiveCollectionModal: React.FC<ArchiveCollectionModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="modal-reveal w-full max-w-5xl bg-[#111619] border border-white/12 rounded-xl p-6 sm:p-8 my-auto max-h-[92vh] overflow-y-auto"
+        ref={modalPanelRef}
+        tabIndex={-1}
+        className="modal-reveal w-full max-w-5xl bg-[#111619] border border-white/12 rounded-xl p-6 sm:p-8 my-auto max-h-[92vh] overflow-y-auto focus:outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 pb-5 border-b border-white/10">

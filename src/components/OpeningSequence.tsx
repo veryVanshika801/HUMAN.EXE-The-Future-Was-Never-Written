@@ -4,6 +4,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { ArrowDown, ArrowRight, Info, SlidersHorizontal, Terminal, Volume2, VolumeX, X } from 'lucide-react';
 import { ARTIFACTS, CORRUPTED_FILES, LOST_ARTIFACTS, SECRET_MEMORIES } from '../data/artifacts';
 import { ArchiveProgressState } from '../types/archive';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -72,6 +73,11 @@ export const OpeningSequence: React.FC<OpeningSequenceProps> = ({
   const wrapperRef = useRef<HTMLElement | null>(null);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [logOpen, setLogOpen] = useState(false);
+  const aboutRef = useRef<HTMLDivElement | null>(null);
+  const logRef = useRef<HTMLDivElement | null>(null);
+
+  useDialogAccessibility(aboutOpen, () => setAboutOpen(false), aboutRef);
+  useDialogAccessibility(logOpen, () => setLogOpen(false), logRef);
 
   useEffect(() => {
     const el = wrapperRef.current;
@@ -251,9 +257,15 @@ export const OpeningSequence: React.FC<OpeningSequenceProps> = ({
           role="dialog"
           aria-modal="true"
           aria-labelledby="about-archive-title"
+          onClick={() => setAboutOpen(false)}
           className="fixed inset-0 z-50 bg-[#090B0D]/92 flex items-center justify-center p-4 pointer-events-auto"
         >
-          <div className="w-full max-w-lg bg-[#111619] border border-white/15 rounded-xl p-6 sm:p-8">
+          <div
+            ref={aboutRef}
+            tabIndex={-1}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg bg-[#111619] border border-white/15 rounded-xl p-6 sm:p-8 focus:outline-none"
+          >
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-xs font-mono-archival text-[#A6C7A9]">CURATORIAL BRIEF · 2075</div>
@@ -288,9 +300,15 @@ export const OpeningSequence: React.FC<OpeningSequenceProps> = ({
           role="dialog"
           aria-modal="true"
           aria-labelledby="system-log-title"
+          onClick={() => setLogOpen(false)}
           className="fixed inset-0 z-50 bg-[#090B0D]/92 flex items-center justify-center p-4 pointer-events-auto"
         >
-          <div className="w-full max-w-lg bg-[#111619] border border-white/15 rounded-xl p-6 sm:p-8 font-mono-archival">
+          <div
+            ref={logRef}
+            tabIndex={-1}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg bg-[#111619] border border-white/15 rounded-xl p-6 sm:p-8 font-mono-archival focus:outline-none"
+          >
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-xs text-[#A6C7A9]">LOCAL ARCHIVE SESSION</div>

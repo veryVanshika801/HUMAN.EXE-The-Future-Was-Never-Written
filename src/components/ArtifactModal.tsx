@@ -21,6 +21,7 @@ import {
 } from '../types/archive';
 import { audioEngine } from '../logic/audioEngine';
 import { buildAutopsyArtifactMesh } from '../scenes/artifactMeshes';
+import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
 
 interface ArtifactModalProps {
   artifact: ArtifactItem | null;
@@ -98,12 +99,18 @@ const ArtifactAutopsyViewport: React.FC<AutopsyViewportProps> = ({
       return;
     }
 
+    const handleContextLost = (e: Event) => {
+      e.preventDefault();
+      setGlFallback(true);
+    };
+    renderer.domElement.addEventListener('webglcontextlost', handleContextLost);
+
     const width = Math.max(260, host.clientWidth);
     const height = Math.max(220, host.clientHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.15;
-    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 1.75));
     renderer.setSize(width, height);
     renderer.domElement.style.display = 'block';
     renderer.domElement.style.width = '100%';
@@ -112,8 +119,10 @@ const ArtifactAutopsyViewport: React.FC<AutopsyViewportProps> = ({
 
     const scene = new THREE.Scene();
     const pmrem = new THREE.PMREMGenerator(renderer);
-    const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    const roomEnv = new RoomEnvironment();
+    const envTex = pmrem.fromScene(roomEnv, 0.04).texture;
     scene.environment = envTex;
+    roomEnv.dispose();
     pmrem.dispose();
 
     const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 40);
@@ -232,6 +241,9 @@ const ArtifactAutopsyViewport: React.FC<AutopsyViewportProps> = ({
     window.addEventListener('pointerup', onPointerUp);
     renderer.domElement.addEventListener('wheel', onWheel, { passive: false });
     window.addEventListener('resize', onResize);
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => onResize()) : null;
+    resizeObserver?.observe(host);
 
     // Gentle idle turntable loop; throttled under software WebGL
     let lastTick = performance.now();
@@ -256,6 +268,8 @@ const ArtifactAutopsyViewport: React.FC<AutopsyViewportProps> = ({
     return () => {
       disposed = true;
       cancelAnimationFrame(rafId);
+      resizeObserver?.disconnect();
+      renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
@@ -371,6 +385,7 @@ export const ArtifactModal: React.FC<ArtifactModalProps> = ({
 }) => {
   const [selectedHotspotId, setSelectedHotspotId] = useState<string>('');
   const [detailTab, setDetailTab] = useState<'context' | 'impact'>('context');
+  const dialogPanelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (artifact?.hotspots?.length) {
@@ -379,14 +394,7 @@ export const ArtifactModal: React.FC<ArtifactModalProps> = ({
     }
   }, [artifact]);
 
-  useEffect(() => {
-    if (!artifact) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [artifact, onClose]);
+  useDialogAccessibility(Boolean(artifact), onClose, dialogPanelRef);
 
   const activeHotspot = useMemo(() => {
     if (!artifact) return null;
@@ -420,7 +428,9 @@ export const ArtifactModal: React.FC<ArtifactModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="modal-reveal w-full max-w-4xl bg-[#111619] border border-white/15 rounded-xl p-5 sm:p-7 shadow-2xl my-auto max-h-[92vh] overflow-y-auto"
+        ref={dialogPanelRef}
+        tabIndex={-1}
+        className="modal-reveal w-full max-w-4xl bg-[#111619] border border-white/15 rounded-xl p-5 sm:p-7 shadow-2xl my-auto max-h-[92vh] overflow-y-auto focus:outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Layout-Tailored Header */}

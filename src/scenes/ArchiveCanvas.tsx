@@ -226,8 +226,10 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
     camera.position.set(0, 0.3, 7.6);
 
     const pmrem = new THREE.PMREMGenerator(renderer);
-    const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    const roomEnv = new RoomEnvironment();
+    const envTex = pmrem.fromScene(roomEnv, 0.04).texture;
     scene.environment = envTex;
+    roomEnv.dispose();
     pmrem.dispose();
 
     // 3-Point Studio Rig + Era Accent Light
@@ -1748,6 +1750,7 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
     const onResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
+      renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 1.75));
       renderer.setSize(window.innerWidth, window.innerHeight);
     };
     window.addEventListener('resize', onResize);

@@ -137,6 +137,10 @@ html.reduced-motion *::after {
 }
 
 @media print {
+  @page {
+    margin: 14mm;
+  }
+  html,
   body {
     background: #FFFFFF !important;
     color: #090B0D !important;
@@ -148,5 +152,17 @@ html.reduced-motion *::after {
     background: #FFFFFF !important;
     color: #090B0D !important;
     border-color: #CBD5E1 !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+  }
+  .print-report * {
+    color: #0F172A !important;
+    border-color: #CBD5E1 !important;
+  }
+  .print-report > div,
+  .print-report div[class*='bg-[#090B0D]'],
+  .print-report div[class*='bg-[#111619]'],
+  .print-report button[class*='bg-[#090B0D]'] {
+    background: #F8FAFC !important;
   }
 }
