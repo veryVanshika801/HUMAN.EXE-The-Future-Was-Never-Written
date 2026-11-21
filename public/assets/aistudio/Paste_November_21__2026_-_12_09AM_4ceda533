@@ -1,0 +1,1143 @@
+# PROJECT: HUMAN.EXE
+## THE FUTURE WAS NEVER WRITTEN.
+### An immersive 3D interactive storytelling experience
+
+Act as a senior creative developer, 3D web designer, motion graphics artist, frontend architect and interactive storytelling director with extensive experience building award-level digital experiences.
+
+Your task is to DESIGN AND DEVELOP a complete, functional, highly polished website called:
+
+**HUMAN.EXE — THE FUTURE WAS NEVER WRITTEN.**
+
+This is a 24-hour hackathon project under the category:
+
+**Scroll-Based Storytelling & Motion Design.**
+
+This must NOT look like a generic AI-generated landing page, dashboard, portfolio or ordinary history website.
+
+It should feel like entering an unexplored futuristic digital museum, discovering lost memories of humanity and gradually uncovering how technological progress shaped civilization.
+
+The visitor must actively participate in the story.
+
+Every choice must have consequences. Every artifact must have a purpose. Every chapter must feel visually distinct.
+
+---
+
+# 01. DESIGN REFERENCE AND ORIGINALITY
+
+Reference website:
+https://sidddemo14terminalwordmark.vercel.app/
+
+Study the reference specifically for its:
+- Scroll experience.
+- Section transitions.
+- Movement and animation pacing.
+- Text reveals.
+- Scroll-based visual storytelling.
+- Overall sense of continuity between sections.
+
+IMPORTANT:
+
+Do NOT copy its complete UI, layout, branding, color scheme, typography, content, graphics or components.
+
+Use it ONLY as inspiration for the quality and style of the scrolling experience.
+
+HUMAN.EXE must have its own recognizable creative identity.
+
+The final result should look like an original futuristic interactive museum.
+
+# 02. VISUAL IDENTITY
+
+Create an elegant, dark, cinematic digital environment.
+
+COLOR PALETTE:
+
+- Background: #090B0D
+- Secondary background: #111619
+- Metallic silver: #BFC7CB
+- Primary text: #F0F2F2
+- Muted grey: #899398
+- Accent green: #A6C7A9
+- Subtle warm amber for the fire chapter.
+- Restrained orange and red for selected historical details.
+
+Avoid:
+- Purple neon.
+- Excessive blue neon.
+- Overly saturated gradients.
+- Random glowing outlines.
+- Excessive glassmorphism.
+- Cartoon-like 3D objects.
+- Generic AI dashboard aesthetics.
+
+DESIGN LANGUAGE:
+
+Think:
+- Digital archaeology.
+- Futuristic museum.
+- Premium cinematic product storytelling.
+- Minimalist science fiction.
+- Reflective metallic objects.
+- Carefully controlled lighting.
+- Atmospheric environmental depth.
+
+Typography should be sharp, sophisticated and readable.
+
+Use large editorial headings, carefully spaced captions, small archive labels and strong typographic hierarchy.
+
+All text must remain readable against the background.
+
+# 03. THE MAIN STORYLINE
+
+The experience takes place in the year 2075.
+
+The visitor is an ARCHIVIST.
+
+They discover an abandoned digital archive containing five historical eras of technological evolution.
+
+The archive has preserved memories, objects, forgotten decisions and fragments of humanity's past.
+
+As the visitor explores the archive, they discover that technological progress was not simply a sequence of inventions.
+
+It was a sequence of human decisions.
+
+The central question:
+
+**"Technology changes the world. Human choices decide what that change means."**
+
+The five chapters are:
+
+1. The First Spark.
+2. The Age of Machines.
+3. The Digital Awakening.
+4. The Connected World.
+5. The Age of Intelligence.
+
+The final destination is the ARCHIVE CORE, where the visitor discovers the future their decisions have created.
+
+# 04. OPENING EXPERIENCE — THE ARCHIVE AWAKENS
+
+Create an extremely polished cinematic opening.
+
+SCREEN:
+
+Almost complete darkness.
+
+A small metallic particle appears in the center.
+
+It slowly expands into a reflective chrome sphere.
+
+The sphere floats in a deep black 3D environment.
+
+Use subtle particles, soft reflections, volumetric lighting and atmospheric depth.
+
+The camera should move slightly as the visitor moves their mouse.
+
+INTRO TEXT, REVEALED IN SEQUENCE:
+
+"We built machines to make life easier."
+
+"We built networks to bring the world closer."
+
+"We built intelligence to answer questions we couldn't."
+
+"Somewhere along the way, we forgot to ask one question."
+
+Then reveal:
+
+**WHO WAS TECHNOLOGY BUILT FOR?**
+
+Main CTA:
+
+ENTER THE ARCHIVE →
+
+Additional functional elements:
+- About the Archive.
+- System Log.
+- Sound On/Off.
+- Reduced Motion.
+- Skip Intro.
+
+On entering, the camera approaches the metallic sphere.
+
+The sphere expands and transitions into the first historical scene.
+
+Do not make the intro unnecessarily long.
+
+# 05. SCROLL EXPERIENCE — EXTREMELY IMPORTANT
+
+The scrolling experience is one of the highest priorities.
+
+Do not build five ordinary sections stacked vertically.
+
+Create a continuous cinematic journey.
+
+Use:
+- GSAP ScrollTrigger.
+- Scroll-scrubbed timelines.
+- Pinned sections.
+- Smooth camera movements.
+- Layered parallax.
+- Split-text reveals.
+- Clip-path transitions.
+- Staggered object appearances.
+- Scroll-controlled object rotation.
+- Horizontal movement inside selected chapters.
+- Scale and depth transitions.
+
+SCROLL BEHAVIOUR:
+
+A. When the visitor enters a chapter, the environment should gradually transform.
+
+B. Keep important 3D objects visible while explanatory text moves around them.
+
+C. Pin selected scenes while the visitor scrolls through their story.
+
+D. Let scroll progress directly control camera movement and object transformations.
+
+E. Use horizontal scrolling only in selected timeline or artifact sequences, not everywhere.
+
+F. Reveal information in a clear, readable order.
+
+G. Scrolling backwards should reverse scroll-linked animations naturally.
+
+H. Never hijack normal browser scrolling.
+
+I. Do not force visitors to wait through long animations.
+
+J. Do not make all elements animate simultaneously.
+
+Create a consistent cinematic rhythm:
+- Establish the environment.
+- Introduce the historical event.
+- Reveal the artifacts.
+- Allow interaction.
+- Present the decision.
+- Show its consequence.
+- Transition into the next era.
+
+The visitor must always understand where they are in the story.
+
+# 06. PERSISTENT NAVIGATION — THE MEMORY MAP
+
+Create an elegant persistent navigation system called:
+
+**THE MEMORY MAP**
+
+It represents the five historical eras as five connected nodes.
+
+Place it discreetly along the side of the screen or in a compact floating navigation area.
+
+Each node represents one chapter.
+
+Behaviour:
+- Current chapter illuminates.
+- Completed chapters remain marked.
+- Unexplored chapters appear inactive.
+- Clicking an unlocked chapter navigates to that chapter.
+- A connecting line gradually fills as the visitor progresses.
+- Hovering over a node displays its chapter name and year.
+- Show the visitor's overall archive completion percentage.
+
+Add a compact top navigation:
+HUMAN.EXE | MEMORY MAP | ARCHIVE LOG | SOUND
+
+Keep the interface minimal.
+
+Do not let navigation cover the actual storytelling experience.
+
+# 07. CHAPTER ONE — THE FIRST SPARK
+
+PERIOD: 50,000 BC
+
+TITLE:
+THE FIRST SPARK
+
+SUBTITLE:
+Before machines, there was curiosity.
+
+STORY:
+
+Humanity's earliest discoveries were not made in laboratories.
+
+They emerged from curiosity, observation and survival.
+
+Fire changed how humans lived, gathered and protected themselves.
+
+But it also introduced a new responsibility: powerful discoveries can create opportunities and consequences.
+
+ENVIRONMENT:
+
+A dark prehistoric cave.
+
+A glowing ember floats in the middle.
+
+Use realistic ember particles, warm light, subtle smoke and atmospheric shadows.
+
+3D ARTIFACTS:
+
+1. THE EMBER.
+2. THE STONE TOOL.
+3. THE SHARED FLAME.
+
+Each artifact must be clickable.
+
+On clicking, focus the camera on the artifact and open a detailed information panel with:
+- Artifact name.
+- Historical context.
+- Why it mattered.
+- Its impact on humanity.
+
+LOST ARTIFACT:
+
+Hide a tiny glowing ember fragment somewhere in the environment.
+
+The visitor must discover and click it.
+
+Unlock:
+LOST MEMORY 001 — THE FIRST GATHERING.
+
+Reveal a short hidden story about how shared discoveries helped human communities.
+
+DECISION:
+
+"What should humanity do with its first great power?"
+
+Choice A: SHARE THE DISCOVERY.
+
+Choice B: KEEP THE KNOWLEDGE RESTRICTED.
+
+Both choices must produce different narrative consequences.
+
+Choice A creates stronger community imagery.
+
+Choice B introduces more controlled access and unequal knowledge imagery.
+
+Transition:
+
+The ember expands to fill the screen.
+
+Its circular form transforms into a rotating industrial gear.
+
+# 08. CHAPTER TWO — THE AGE OF MACHINES
+
+PERIOD: 1760–1900
+
+TITLE:
+THE AGE OF MACHINES
+
+SUBTITLE:
+Humanity learned to multiply its strength.
+
+STORY:
+
+Machines transformed production, transportation and cities.
+
+The industrial revolution made society faster and more productive.
+
+But the growing power of machines also raised questions about work, inequality and human purpose.
+
+ENVIRONMENT:
+
+An atmospheric industrial factory.
+
+Massive rotating gears.
+
+Steam, subtle mechanical movement, metallic surfaces and dramatic lighting.
+
+3D ARTIFACTS:
+
+1. THE STEAM ENGINE.
+2. THE FACTORY GEAR.
+3. THE CLOCKWORK MACHINE.
+
+Clicking an artifact should activate a camera focus and open a contextual story panel.
+
+SPECIAL INTERACTION:
+
+THE MACHINE ROOM.
+
+Create an interactive mechanical structure with several rotating gears.
+
+When the visitor clicks a gear, another part of the machine activates.
+
+Show how one invention influenced another.
+
+LOST ARTIFACT:
+
+A small antique pocket watch hidden among the machinery.
+
+Clicking it unlocks:
+
+LOST MEMORY 002 — THE HUMAN HOUR.
+
+Reveal how industrialization transformed the relationship between time, work and daily life.
+
+DECISION:
+
+"What should progress prioritize?"
+
+Choice A: MAXIMUM PRODUCTIVITY.
+
+Choice B: HUMAN PURPOSE.
+
+Different choices should affect the next chapter's environment, story and archive records.
+
+Transition:
+
+A massive gear rotates towards the camera.
+
+Its circular center transforms into an early computer screen.
+
+# 09. CHAPTER THREE — THE DIGITAL AWAKENING
+
+PERIOD: 1940–1990
+
+TITLE:
+THE DIGITAL AWAKENING
+
+SUBTITLE:
+Humanity taught machines to think in information.
+
+STORY:
+
+Computers changed the way humanity processes information.
+
+From scientific calculations to communication, the digital age introduced an entirely new form of power.
+
+Knowledge became something that could be stored, processed and shared.
+
+ENVIRONMENT:
+
+A vintage computing laboratory gradually transforming into a futuristic data archive.
+
+Use retro terminal elements, green monochrome text, old computer components and emerging digital structures.
+
+3D ARTIFACTS:
+
+1. THE MEMORY CHIP.
+2. THE PROCESSOR.
+3. THE TERMINAL.
+
+SPECIAL INTERACTION:
+
+THE MEMORY TERMINAL.
+
+Create a realistic interactive retro terminal.
+
+Display animated system messages:
+
+> MEMORY MODULE ACTIVATED
+> INFORMATION STORED
+> DATA PROCESSING
+> HUMAN KNOWLEDGE EXPANDING
+> ETHICAL QUESTION DETECTED
+
+Allow visitors to click:
+- MEMORY.
+- CONNECTION.
+- CODE.
+
+Each opens a different educational archive entry.
+
+CORRUPTED FILE SYSTEM:
+
+Introduce an archive section containing several corrupted historical files.
+
+Display filenames such as:
+
+MEMORY_001.DAT
+
+HUMAN_HISTORY_04.BIN
+
+UNKNOWN_ARCHIVE_2075.LOG
+
+Some files should have corrupted or incomplete status indicators.
+
+Visitors can click REPAIR FILE.
+
+After repair, reveal:
+- A hidden historical memory.
+- A surprising technological fact.
+- A short piece of narrative.
+- A connection to a later chapter.
+
+Make the corrupted file interaction genuinely functional.
+
+LOST ARTIFACT:
+
+An old floppy disk.
+
+Unlock:
+
+LOST MEMORY 003 — THE FIRST DIGITAL FOOTPRINT.
+
+DECISION:
+
+"Who should control knowledge?"
+
+Choice A: OPEN KNOWLEDGE FOR EVERYONE.
+
+Choice B: PROTECT PERSONAL INFORMATION.
+
+Both choices must affect future chapter details.
+
+Transition:
+
+Computer pixels dissolve into thousands of floating particles.
+
+The particles connect to form a globe.
+
+# 10. CHAPTER FOUR — THE CONNECTED WORLD
+
+PERIOD: 1990–2025
+
+TITLE:
+THE CONNECTED WORLD
+
+SUBTITLE:
+Distance became smaller. The digital world became larger.
+
+STORY:
+
+The internet transformed human communication.
+
+People could connect, learn, work and collaborate across continents.
+
+But the connected world also introduced new questions about privacy, identity, information and responsibility.
+
+ENVIRONMENT:
+
+A dark futuristic digital space.
+
+A realistic, elegant rotating 3D globe in the center.
+
+Surround it with connected nodes, fine luminous lines and floating information fragments.
+
+3D INTERACTION:
+
+THE GLOBAL NETWORK.
+
+The globe must rotate slowly.
+
+Allow users to:
+- Drag to rotate.
+- Click connection points.
+- Zoom slightly.
+- Inspect digital locations.
+- Reveal information panels.
+
+ARTIFACTS:
+
+1. THE FIRST WEB PAGE.
+2. THE CLOUD.
+3. DIGITAL IDENTITY.
+
+LOST ARTIFACT:
+
+A tiny disconnected network node.
+
+When discovered, it unlocks:
+
+LOST MEMORY 004 — THE OFFLINE WORLD.
+
+Reveal a short reflection about the value of privacy and life outside digital networks.
+
+CORRUPTED FILE:
+
+A partially damaged file about the first internet connection.
+
+Repairing it unlocks a small historical timeline.
+
+DECISION:
+
+"What kind of connected world should humanity build?"
+
+Choice A: TOTAL CONNECTION.
+
+Choice B: DIGITAL PRIVACY.
+
+The choice should influence the final AI chapter's narrative and environmental design.
+
+Transition:
+
+The globe slowly dissolves into a network of neural connections.
+
+A central glowing intelligence core appears.
+
+# 11. CHAPTER FIVE — THE AGE OF INTELLIGENCE
+
+PERIOD: 2025–2075
+
+TITLE:
+THE AGE OF INTELLIGENCE
+
+SUBTITLE:
+Humanity created intelligence beyond its own imagination.
+
+STORY:
+
+Artificial intelligence transforms creativity, science, education and decision-making.
+
+Machines can assist with increasingly complex tasks.
+
+But a difficult question remains:
+
+If machines can do almost everything, what makes us human?
+
+ENVIRONMENT:
+
+A sophisticated futuristic research archive.
+
+A large floating neural core in the center.
+
+Multiple metallic and glass layers rotate around it.
+
+Use subtle silver and green illumination.
+
+3D ARTIFACTS:
+
+1. THE NEURAL CORE.
+2. THE CREATIVE ENGINE.
+3. THE HUMAN MEMORY.
+
+INTERACTIONS:
+
+Click each object to reveal a different perspective on AI:
+- Creativity.
+- Human responsibility.
+- Identity.
+
+LOST ARTIFACT:
+
+A small handwritten note floating inside the AI environment.
+
+Unlock:
+
+LOST MEMORY 005 — THE LAST HUMAN QUESTION.
+
+The note contains:
+
+"Progress is not measured by what our machines can do. It is measured by what humanity chooses to do with them."
+
+FINAL DECISION:
+
+"Who should shape the future?"
+
+Choice A: AI LEADS.
+
+Choice B: HUMANS LEAD.
+
+Choice C: HUMANS AND AI COLLABORATE.
+
+Each option must lead to a different future simulation.
+
+Transition:
+
+All five historical artifacts begin orbiting the central AI core.
+
+The screen fades into the final archive.
+
+# 12. THE BRANCHING DECISION ENGINE
+
+THIS IS ONE OF THE MOST IMPORTANT FUNCTIONAL REQUIREMENTS.
+
+There are five decisions.
+
+The first four have two options each.
+
+The final decision has three options.
+
+Total possible paths:
+
+2 × 2 × 2 × 2 × 3 = 48.
+
+Do not implement a fake choice system where every answer leads to the exact same result.
+
+Every choice must:
+- Be stored.
+- Affect the following chapters.
+- Change narrative details.
+- Change at least one visual or environmental detail.
+- Influence the final outcome.
+- Appear in the final archive report.
+
+Create a deterministic JavaScript decision engine.
+
+Use three broad future archetypes:
+
+A. THE HUMAN RENAISSANCE.
+
+B. THE MACHINE DOMINION.
+
+C. THE SYMBIOTIC FUTURE.
+
+However, do NOT limit the experience to three generic ending paragraphs.
+
+Create 48 distinct decision-path outcomes.
+
+Each unique five-choice combination should generate:
+- A unique archive path ID.
+- A personalized future description.
+- A unique final archive message.
+- A combination-specific historical summary.
+- A different set of unlocked memory records.
+- A personalized final visual variation.
+
+Use a transparent influence-scoring system to determine the overarching future archetype.
+
+Create separate narrative variations for every decision combination.
+
+Do not tell visitors that all choices are merely cosmetic.
+
+The first choice should visibly affect Chapter 2.
+
+The second choice should visibly affect Chapter 3.
+
+The third choice should visibly affect Chapter 4.
+
+The fourth choice should visibly affect Chapter 5.
+
+The fifth choice should determine the final future simulation.
+
+Previous choices must remain available when navigating backwards.
+
+Include a choice confirmation and an alternative preview mode.
+
+# 13. THREE MAJOR ENDINGS
+
+ENDING A — THE HUMAN RENAISSANCE
+
+A future where technology empowers humanity.
+
+Visual:
+A futuristic civilization with natural landscapes, elegant architecture, greenery and human-centered technology.
+
+Narrative:
+
+"The greatest invention was never the machine. It was the human imagination that created it."
+
+ENDING B — THE MACHINE DOMINION
+
+A civilization where automated systems dominate society.
+
+Visual:
+A massive mechanical city, metallic structures, a monumental AI core and controlled lighting.
+
+Narrative:
+
+"Humanity created intelligence to serve itself. It forgot to decide where service should end."
+
+ENDING C — THE SYMBIOTIC FUTURE
+
+A future where humans and AI collaborate.
+
+Visual:
+Organic landscapes, advanced architecture, interconnected systems and balanced technology.
+
+Narrative:
+
+"The future was never about choosing between humans and machines. It was about learning how to build together."
+
+Each ending must have:
+- A unique 3D environment.
+- A cinematic reveal.
+- A personalized narrative.
+- A final archive summary.
+- Replay History.
+- Compare Decisions.
+
+# 14. SPECIAL FEATURE — LOST ARTIFACTS
+
+Build a proper collectible system.
+
+One hidden artifact exists in each chapter.
+
+Each artifact must be visually integrated into the environment.
+
+Do not simply display five collectible cards.
+
+The visitor must discover them through exploration.
+
+Examples:
+- Chapter 1: Ember fragment.
+- Chapter 2: Antique pocket watch.
+- Chapter 3: Floppy disk.
+- Chapter 4: Disconnected network node.
+- Chapter 5: Handwritten note.
+
+On discovery:
+- Trigger a subtle particle burst.
+- Play a small optional sound.
+- Display a LOST MEMORY notification.
+- Add the artifact to the archive collection.
+- Unlock its narrative.
+
+Create an ARCHIVE COLLECTION screen where discovered objects can be revisited.
+
+The collection must retain progress using LocalStorage.
+
+# 15. SPECIAL FEATURE — MEMORY MAP
+
+Create a visual map of the five eras.
+
+Each chapter is represented by a distinct symbol.
+
+When a chapter is completed:
+- Its node illuminates.
+- Its connecting line activates.
+- Its artifacts become accessible.
+- Its historical information becomes available.
+
+Allow navigation between completed chapters.
+
+Create a final expanded map showing all five eras connected to the visitor's chosen future.
+
+# 16. SPECIAL FEATURE — CORRUPTED FILES
+
+Create an interactive digital archive.
+
+Use a terminal-inspired visual style.
+
+Some entries should appear damaged.
+
+Visitors can select REPAIR.
+
+After clicking:
+- Display a brief repair animation.
+- Show the restored content.
+- Reveal a hidden historical detail.
+- Unlock an archive entry.
+
+Create at least five distinct corrupted files.
+
+Some files should require discovering a Lost Artifact first.
+
+Do not make every file unlock immediately.
+
+# 17. SPECIAL FEATURE — WHAT IF?
+
+At every major decision, add a WHAT IF? interaction.
+
+The visitor can temporarily preview the alternative decision.
+
+Show:
+- A short alternative narrative.
+- A visual preview.
+- A description of the possible consequence.
+
+Previewing must not overwrite their actual decision.
+
+Provide:
+RETURN TO MY TIMELINE.
+
+# 18. SPECIAL FEATURE — ARCHIVE PROFILE
+
+At the end, generate a personalized ARCHIVIST PROFILE.
+
+Display:
+- Unique archive path ID.
+- All five selected choices.
+- Three major influence scores.
+- Discovered artifacts.
+- Repaired files.
+- Unlocked memories.
+- Final ending.
+- Completion percentage.
+
+Create a beautifully designed final profile card.
+
+Allow the visitor to:
+- Replay the journey.
+- Compare a new path.
+- View all archived decisions.
+- Download or print their final archive report.
+
+# 19. ANIMATION AND 3D DEVELOPMENT
+
+Act like a professional 3D developer and motion designer.
+
+Use a deliberate animation system.
+
+TECHNOLOGIES:
+
+- React Three Fiber.
+- Three.js.
+- GSAP.
+- GSAP ScrollTrigger.
+- CSS 3D transforms.
+- Framer Motion only where it provides a clear benefit.
+
+3D EFFECTS:
+
+1. Realistic floating chrome sphere.
+2. Ember particle simulation.
+3. Rotating mechanical gears.
+4. Computer terminal and pixel transitions.
+5. Interactive 3D globe.
+6. Floating neural core.
+7. Morphing-inspired transitions between artifacts.
+8. Depth-based camera movement.
+9. Environment changes based on choices.
+10. Cinematic ending environments.
+
+ANIMATION DETAILS:
+
+- Smooth camera dolly.
+- Scroll-scrubbed object rotation.
+- Magnetic buttons.
+- Subtle hover elevation.
+- Staggered typography.
+- Text masking.
+- Particle trails.
+- Controlled bloom.
+- Camera focus on clicked artifacts.
+- Layered environmental parallax.
+- Fast, precise micro-interactions.
+- Smooth scene transitions.
+
+Use sharp, intentional animations.
+
+Avoid sluggish, excessive bouncing and random floating movements.
+
+The 3D graphics must be visually clear and recognizable.
+
+Objects must not become so dark or reflective that their shapes disappear.
+
+Use proper lighting, contrast, camera positioning and object scale.
+
+# 20. AUDIO DESIGN
+
+Create optional ambient audio.
+
+Each chapter can have its own subtle sound environment.
+
+- Intro: atmospheric ambient drone.
+- Fire: gentle crackling.
+- Industrial era: subtle mechanical ambience.
+- Computer era: restrained terminal sounds.
+- Internet era: soft digital atmosphere.
+- AI era: subtle synthesized tones.
+- Ending: cinematic sound reveal.
+
+Audio must only begin after explicit user interaction.
+
+Provide mute/unmute controls.
+
+Do not make sound necessary to understand the experience.
+
+# 21. TECHNICAL ARCHITECTURE
+
+Build with a deployment-friendly frontend architecture.
+
+PREFERRED STACK:
+
+- React.
+- Vite.
+- JavaScript.
+- Three.js / React Three Fiber.
+- GSAP + ScrollTrigger.
+- CSS.
+- LocalStorage.
+
+Avoid unnecessary backend services.
+
+Do not require paid APIs, authentication, external databases or environment secrets.
+
+Keep all story content and decision logic in local data files.
+
+Suggested project organization:
+
+src/
+  components/
+    Navbar
+    Hero
+    MemoryMap
+    Chapter
+    Artifact
+    ArtifactModal
+    ChoicePanel
+    CorruptedFiles
+    ArchiveCollection
+    Ending
+    ArchivistProfile
+
+  scenes/
+    IntroScene
+    FireScene
+    MachineScene
+    ComputerScene
+    NetworkScene
+    AIScene
+    EndingScene
+
+  data/
+    chapters
+    artifacts
+    endings
+
+  logic/
+    decisionEngine
+    archiveProgress
+    storyConsequences
+
+  hooks/
+    useScrollProgress
+    useArchiveProgress
+
+  styles/
+    global
+    animations
+    chapters
+
+Do not create unnecessary components if a simpler structure is better.
+
+# 22. VERCEL DEPLOYMENT REQUIREMENTS
+
+The website must be deployable directly through Vercel.
+
+Important:
+- No localhost-only assumptions.
+- No hardcoded machine-specific file paths.
+- No dependency on a local backend.
+- No secret API keys.
+- No server-side database requirements.
+- Use relative asset paths.
+- Ensure production build succeeds.
+- Ensure all dependencies are listed in package.json.
+- Avoid unnecessary heavy libraries.
+- Ensure correct routing and asset loading.
+- Avoid browser-only APIs during server rendering if using an SSR framework.
+- Use lazy loading for heavy 3D scenes.
+- Add graceful WebGL fallbacks.
+
+Prefer Vite + React for straightforward static deployment.
+
+# 23. RESPONSIVE DESIGN AND PERFORMANCE
+
+Desktop should receive the full cinematic experience.
+
+Mobile should remain fully functional.
+
+Adapt:
+- 3D object scale.
+- Camera distance.
+- Animation complexity.
+- Navigation layout.
+- Artifact interaction.
+- Text size.
+- Section heights.
+
+Use click and touch interactions rather than relying only on hover.
+
+Respect reduced-motion settings.
+
+Avoid:
+- Huge unoptimized 3D models.
+- Excessive particle counts.
+- Multiple unnecessary WebGL canvases.
+- Continuous expensive rendering when a scene is inactive.
+- Long blank loading screens.
+
+Show meaningful loading states.
+
+# 24. FINAL QUALITY CONTROL
+
+Before considering the project complete, test:
+
+1. The complete opening sequence.
+2. All five historical chapters.
+3. Every artifact interaction.
+4. All five decisions.
+5. Every branching consequence.
+6. All 48 possible decision combinations.
+7. All three major ending archetypes.
+8. Lost artifact collection.
+9. Corrupted file repair.
+10. Memory Map navigation.
+11. What If previews.
+12. Replay functionality.
+13. LocalStorage persistence.
+14. Sound controls.
+15. Mobile responsiveness.
+16. Reduced-motion mode.
+17. WebGL fallback.
+18. Production build.
+
+No dead buttons.
+
+No placeholder interactions.
+
+No fake progress indicators.
+
+No missing story content.
+
+No broken transitions.
+
+No console errors.
+
+# 25. CREATIVE EXECUTION PRIORITIES
+
+Work in the following order:
+
+PRIORITY 1:
+Create the complete visual identity and cinematic opening.
+
+PRIORITY 2:
+Implement the complete five-chapter storytelling experience.
+
+PRIORITY 3:
+Implement real decision logic and branching consequences.
+
+PRIORITY 4:
+Build Lost Artifacts, Memory Map and Corrupted Files.
+
+PRIORITY 5:
+Add high-quality 3D environments and scroll-driven animations.
+
+PRIORITY 6:
+Create all three ending environments and the personalized Archivist Profile.
+
+PRIORITY 7:
+Optimize and test the entire application for Vercel.
+
+Do not stop after producing a beautiful hero section.
+
+Do not generate a static mockup.
+
+Build the actual working experience.
+
+If a complex effect threatens performance or completion time, create a visually convincing lightweight implementation rather than leaving it unfinished.
+
+Make creative decisions independently.
+
+Do not repeatedly ask for design approvals.
+
+---
+
+# FINAL CREATIVE VISION
+
+The visitor should feel that they have entered a mysterious archive, explored the evolution of humanity, discovered forgotten memories, made meaningful decisions and witnessed a future shaped by their own choices.
+
+The entire website should feel like one continuous cinematic experience.
+
+The most important qualities are:
+
+1. ORIGINALITY.
+2. IMMERSIVE SCROLL STORYTELLING.
+3. CLEAR AND BEAUTIFUL 3D GRAPHICS.
+4. MEANINGFUL INTERACTIVITY.
+5. REAL BRANCHING CONSEQUENCES.
+6. SMOOTH, SHARP ANIMATIONS.
+7. RESPONSIVE AND RELIABLE PERFORMANCE.
+
+Project name: HUMAN.EXE
+
+Main tagline:
+
+**THE FUTURE WAS NEVER WRITTEN.**
+
+Final closing statement:
+
+**"Technology is what we build. The future is what we choose."**
+
+Now build the complete application. Do not just describe how it could be built. Implement it.

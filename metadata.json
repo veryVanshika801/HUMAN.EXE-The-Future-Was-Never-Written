@@ -1,0 +1,6 @@
+{
+  "name": "HUMAN.EXE — The Future Was Never Written",
+  "description": "An immersive 2075 digital archaeology museum and scroll-driven 3D storytelling experience exploring five eras of human technological choices.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
