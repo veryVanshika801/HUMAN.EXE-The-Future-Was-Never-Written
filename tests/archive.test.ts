@@ -20,12 +20,11 @@ import {
   escapeHtml,
 } from '../src/utils/archiveReport.ts';
 import {
-  MAX_QUESTION_LENGTH,
-  createRateLimiter,
-  extractClientIp,
-  handleArchivistRequest,
-  resolveConfiguredModel,
-} from '../server/archivistCore.ts';
+  clearArchivistConversation,
+  createInitialArchivistMessages,
+  queryArchivist,
+} from '../src/logic/archivistEngine.ts';
+import { ARCHIVIST_FALLBACK_MESSAGE } from '../src/data/archivistKnowledge.ts';
 
 let passed = 0;
 
@@ -241,210 +240,237 @@ await runTest('Offline HTML dossier and TXT report accurately reflect progress w
   assert.equal(escapeHtml('<script>"test"&\'x\'</script>'), '&lt;script&gt;&quot;test&quot;&amp;&#39;x&#39;&lt;/script&gt;');
 });
 
-await runTest('Archivist API enforces per-IP rate limiting and isolates separate client IPs', async () => {
-  const limiter = createRateLimiter(2, 60_000);
-  const mockSuccess = async () => ({ text: 'Archive verified.' });
-
-  const r1 = await handleArchivistRequest(
-    { question: 'Hello Archivist' },
-    { apiKey: 'test-key', clientIp: '10.0.0.1', rateLimiter: limiter, nowMs: 1_000, generateContentFn: mockSuccess }
-  );
-  const r2 = await handleArchivistRequest(
-    { question: 'Second question' },
-    { apiKey: 'test-key', clientIp: '10.0.0.1', rateLimiter: limiter, nowMs: 2_000, generateContentFn: mockSuccess }
-  );
-  const r3Blocked = await handleArchivistRequest(
-    { question: 'Third question blocked' },
-    { apiKey: 'test-key', clientIp: '10.0.0.1', rateLimiter: limiter, nowMs: 3_000, generateContentFn: mockSuccess }
-  );
-  const otherIpOk = await handleArchivistRequest(
-    { question: 'Different IP stays allowed' },
-    { apiKey: 'test-key', clientIp: '10.0.0.2', rateLimiter: limiter, nowMs: 3_000, generateContentFn: mockSuccess }
-  );
-  const afterWindow = await handleArchivistRequest(
-    { question: 'Window expired' },
-    { apiKey: 'test-key', clientIp: '10.0.0.1', rateLimiter: limiter, nowMs: 65_000, generateContentFn: mockSuccess }
-  );
-
-  assert.equal(r1.status, 200);
-  assert.equal(r2.status, 200);
-  assert.equal(r3Blocked.status, 429);
-  assert.equal(r3Blocked.body.ok, false);
-  if (!r3Blocked.body.ok) {
-    assert.equal(r3Blocked.body.code, 'RATE_LIMITED');
-    assert.ok((r3Blocked.body.retryAfterSeconds ?? 0) >= 1);
+await runTest('Archivist (1): Chapter-based queries and contextual "this chapter" resolve accurately', () => {
+  const ch2 = queryArchivist({
+    question: 'Tell me about Chapter 2',
+    activeChapter: 'ch1',
+    state: DEFAULT_ARCHIVE_STATE,
+  });
+  assert.equal(ch2.ok, true);
+  if (ch2.ok) {
+    assert.equal(ch2.matched, true);
+    assert.ok(ch2.answer.includes('Age of Machines'));
+    assert.ok(ch2.answer.includes('James Watt'));
+    assert.ok(ch2.answer.includes('Maximum Productivity'));
   }
-  assert.equal(otherIpOk.status, 200);
-  assert.equal(afterWindow.status, 200);
-  assert.equal(extractClientIp({ 'x-forwarded-for': '203.0.113.9, 10.0.0.1' }), '203.0.113.9');
-});
 
-await runTest('Archivist API rejects invalid, malformed, empty, and oversized payloads', async () => {
-  const nonObj = await handleArchivistRequest([] as unknown as { question: string }, 'fake-key');
-  assert.equal(nonObj.status, 400);
-
-  const emptyQ = await handleArchivistRequest({ question: '   ' }, 'fake-key');
-  assert.equal(emptyQ.status, 400);
-
-  const longQ = await handleArchivistRequest({ question: 'a'.repeat(MAX_QUESTION_LENGTH + 1) }, 'fake-key');
-  assert.equal(longQ.status, 400);
-
-  const badHistory = await handleArchivistRequest(
-    { question: 'Valid?', history: 'not-an-array' },
-    'fake-key'
-  );
-  assert.equal(badHistory.status, 400);
-
-  const badRole = await handleArchivistRequest(
-    { question: 'Valid?', history: [{ role: 'system', text: 'hijack' }] },
-    'fake-key'
-  );
-  assert.equal(badRole.status, 400);
-
-  const badContext = await handleArchivistRequest(
-    { question: 'Valid?', archiveContext: 'bad-context-string' },
-    'fake-key'
-  );
-  assert.equal(badContext.status, 400);
-
-  const hugePayload = await handleArchivistRequest(
-    {
-      question: 'Valid?',
-      history: Array.from({ length: 20 }, (_, i) => ({
-        role: i % 2 === 0 ? 'user' : 'model',
-        text: 'x'.repeat(2500),
-      })),
-    },
-    'fake-key'
-  );
-  assert.equal(hugePayload.status, 413);
-  if (!hugePayload.body.ok) {
-    assert.equal(hugePayload.body.code, 'PAYLOAD_TOO_LARGE');
+  const contextualCh4 = queryArchivist({
+    question: 'Explain this chapter',
+    activeChapter: 'ch4',
+    state: DEFAULT_ARCHIVE_STATE,
+  });
+  assert.equal(contextualCh4.ok, true);
+  if (contextualCh4.ok) {
+    assert.equal(contextualCh4.matched, true);
+    assert.ok(contextualCh4.answer.includes('The Connected World'));
+    assert.ok(contextualCh4.answer.includes('ARPANET'));
   }
 });
 
-await runTest('Archivist API handles missing keys, invalid models, quotas, and sanitizes upstream errors', async () => {
-  const noKey = await handleArchivistRequest({ question: 'Tell me about Chapter 1' }, '');
-  assert.equal(noKey.status, 503);
-  if (!noKey.body.ok) {
-    assert.equal(noKey.body.code, 'MISSING_API_KEY');
-    assert.equal(noKey.body.configured, false);
-  }
-
-  assert.equal(resolveConfiguredModel('gemini-4-hydrogen').valid, true);
-  assert.equal(resolveConfiguredModel('gemini-unknown-99').valid, false);
-
-  const badModelConfig = await handleArchivistRequest(
-    { question: 'Tell me about Chapter 1' },
-    { apiKey: 'test-key', modelOverride: 'unsupported-model-x' }
-  );
-  assert.equal(badModelConfig.status, 500);
-  if (!badModelConfig.body.ok) {
-    assert.equal(badModelConfig.body.code, 'INVALID_MODEL_CONFIG');
-  }
-
-  const quotaHit = await handleArchivistRequest(
-    { question: 'Analyze 2075' },
-    {
-      apiKey: 'test-key',
-      generateContentFn: async () => {
-        const e = new Error('RESOURCE_EXHAUSTED: Quota exceeded for internal project 999') as Error & { status?: number };
-        e.status = 429;
-        throw e;
-      },
+await runTest('Archivist (2 & 3): Historical figure recognition works across varied phrasings', () => {
+  const phrasings = [
+    'Who was Ada Lovelace?',
+    'Who is Ada?',
+    'Tell me about Ada',
+    'Why was Lovelace important?',
+  ];
+  for (const q of phrasings) {
+    const res = queryArchivist({
+      question: q,
+      activeChapter: 'intro',
+      state: DEFAULT_ARCHIVE_STATE,
+    });
+    assert.equal(res.ok, true, `Failed on phrasing: ${q}`);
+    if (res.ok) {
+      assert.equal(res.matched, true, `Expected match for phrasing: ${q}`);
+      assert.ok(res.answer.includes('Ada Lovelace'), `Expected Ada Lovelace details for: ${q}`);
+      assert.ok(res.answer.includes('Analytical Engine'));
     }
-  );
-  assert.equal(quotaHit.status, 429);
-  if (!quotaHit.body.ok) {
-    assert.equal(quotaHit.body.code, 'QUOTA_EXCEEDED');
-    assert.ok(!quotaHit.body.error.includes('999'));
   }
 
-  const badAuth = await handleArchivistRequest(
-    { question: 'Analyze 2075' },
-    {
-      apiKey: 'test-key',
-      generateContentFn: async () => {
-        const e = new Error('API_KEY_INVALID for key AIzaFakeSecret123') as Error & { status?: number };
-        e.status = 403;
-        throw e;
-      },
-    }
-  );
-  assert.equal(badAuth.status, 503);
-  if (!badAuth.body.ok) {
-    assert.equal(badAuth.body.code, 'INVALID_API_KEY');
-    assert.ok(!badAuth.body.error.includes('AIzaFakeSecret123'));
+  const turing = queryArchivist({
+    question: 'Who was Alan Turing?',
+    activeChapter: 'ch3',
+    state: DEFAULT_ARCHIVE_STATE,
+  });
+  assert.equal(turing.ok, true);
+  if (turing.ok) {
+    assert.equal(turing.matched, true);
+    assert.ok(turing.answer.includes('Universal Turing Machine'));
   }
 
-  const upstreamLeakCheck = await handleArchivistRequest(
-    { question: 'Analyze 2075' },
-    {
-      apiKey: 'test-key',
-      generateContentFn: async () => {
-        throw new Error('ECONNRESET https://secret-internal-host.internal/v1 sk-raw-secret');
-      },
-    }
-  );
-  assert.equal(upstreamLeakCheck.status, 502);
-  if (!upstreamLeakCheck.body.ok) {
-    assert.equal(upstreamLeakCheck.body.code, 'UPSTREAM_ERROR');
-    assert.ok(!upstreamLeakCheck.body.error.includes('secret-internal-host'));
-    assert.ok(!upstreamLeakCheck.body.error.includes('sk-raw-secret'));
-  }
-
-  const emptyOutput = await handleArchivistRequest(
-    { question: 'Analyze 2075' },
-    { apiKey: 'test-key', generateContentFn: async () => ({ text: '   ' }) }
-  );
-  assert.equal(emptyOutput.status, 502);
-  if (!emptyOutput.body.ok) {
-    assert.equal(emptyOutput.body.code, 'UPSTREAM_ERROR');
+  const berners = queryArchivist({
+    question: 'Why does Tim Berners-Lee matter in Chapter 4?',
+    activeChapter: 'ch4',
+    state: DEFAULT_ARCHIVE_STATE,
+  });
+  assert.equal(berners.ok, true);
+  if (berners.ok) {
+    assert.equal(berners.matched, true);
+    assert.ok(berners.answer.includes('CERN'));
+    assert.ok(berners.answer.includes('royalty-free'));
   }
 });
 
-await runTest('Archivist API enforces upstream timeout, triggers AbortSignal, and isolates dev diagnostics', async () => {
-  let sawAbortSignal = false;
-  const timedOut = await handleArchivistRequest(
-    { question: 'Why does fire spark technological history?' },
-    {
-      apiKey: 'AIzaTestSecretShouldNeverLeak',
-      upstreamTimeoutMs: 45,
-      includeDevDiagnostics: true,
-      generateContentFn: ({ signal }) =>
-        new Promise((_resolve, reject) => {
-          signal?.addEventListener('abort', () => {
-            sawAbortSignal = true;
-            const err = new Error('aborted by signal');
-            err.name = 'AbortError';
-            reject(err);
-          });
-        }),
-    }
-  );
-
-  assert.equal(sawAbortSignal, true, 'Upstream abort signal must fire on timeout');
-  assert.equal(timedOut.status, 504);
-  assert.equal(timedOut.body.ok, false);
-  if (!timedOut.body.ok) {
-    assert.equal(timedOut.body.code, 'UPSTREAM_TIMEOUT');
-    assert.ok(timedOut.body.diagnostics, 'Dev diagnostics should be attached when enabled');
-    assert.equal(timedOut.body.diagnostics?.model, 'gemini-4-hydrogen');
-    assert.ok((timedOut.body.diagnostics?.durationMs ?? 0) >= 35);
-    assert.ok(!JSON.stringify(timedOut.body).includes('AIzaTestSecretShouldNeverLeak'));
+await runTest('Archivist (4): Multi-topic queries combine relevant complementary records cleanly', () => {
+  const bridge = queryArchivist({
+    question: 'How do Babbage and Ada Lovelace connect Chapter 2 to Chapter 3?',
+    activeChapter: 'ch3',
+    state: DEFAULT_ARCHIVE_STATE,
+  });
+  assert.equal(bridge.ok, true);
+  if (bridge.ok) {
+    assert.equal(bridge.matched, true);
+    assert.ok(bridge.topics.length >= 2, 'Expected multiple matched topics for bridge query');
+    assert.ok(bridge.answer.includes('Babbage'));
+    assert.ok(bridge.answer.includes('Ada Lovelace'));
   }
 
-  const prodTimedOut = await handleArchivistRequest(
-    { question: 'Production mode omits diagnostics' },
-    {
-      apiKey: 'AIzaProdSecret',
-      upstreamTimeoutMs: 25,
-      includeDevDiagnostics: false,
-      generateContentFn: () => new Promise(() => {}),
+  const crossTopics = queryArchivist({
+    question: 'Compare ENIAC and Grace Hopper with Chapter 5 Artificial Intelligence',
+    activeChapter: 'ch5',
+    state: DEFAULT_ARCHIVE_STATE,
+  });
+  assert.equal(crossTopics.ok, true);
+  if (crossTopics.ok) {
+    assert.equal(crossTopics.matched, true);
+    assert.ok(crossTopics.topics.length >= 2);
+    assert.ok(crossTopics.answer.includes('Grace Hopper'));
+  }
+});
+
+await runTest('Archivist (5): Out-of-scope or unknown queries return exact honest fallback', () => {
+  const outOfScopeQueries = [
+    'What is the weather in Tokyo tomorrow?',
+    'Give me a recipe for chocolate cake',
+    'What is Bitcoin trading at today?',
+    'xkcd qzplmn',
+  ];
+  for (const q of outOfScopeQueries) {
+    const res = queryArchivist({
+      question: q,
+      activeChapter: 'ch4',
+      state: DEFAULT_ARCHIVE_STATE,
+    });
+    assert.equal(res.ok, true);
+    if (res.ok) {
+      assert.equal(res.matched, false, `Unexpected match for out-of-scope query: ${q}`);
+      assert.equal(res.recordType, 'fallback');
+      assert.equal(res.answer, ARCHIVIST_FALLBACK_MESSAGE);
     }
-  );
-  assert.equal(prodTimedOut.status, 504);
-  assert.equal(prodTimedOut.body.diagnostics, undefined, 'Production mode must omit dev diagnostics');
+  }
+});
+
+await runTest('Archivist (6 & 7): Archive-state awareness reflects real discoveries and pending choices honestly', () => {
+  const partialState = {
+    ...DEFAULT_ARCHIVE_STATE,
+    visitedChapters: [1, 2, 3] as const,
+    decisions: { ch1: 'share' as const, ch3: 'privacy' as const },
+    inspectedArtifacts: ['art-ember', 'art-steam-engine'],
+    discoveredLostArtifacts: ['lost-001'],
+    repairedFiles: ['file-mem-001'],
+    unlockedSecrets: ['secret-001'],
+  };
+
+  const progressRes = queryArchivist({
+    question: 'Which artifacts have I inspected and what should I explore next?',
+    activeChapter: 'ch2',
+    state: { ...partialState, visitedChapters: [...partialState.visitedChapters] },
+    completionPercentage: 22,
+  });
+  assert.equal(progressRes.ok, true);
+  if (progressRes.ok) {
+    assert.equal(progressRes.matched, true);
+    assert.ok(progressRes.answer.includes('Era Artifacts Inspected: 2/'));
+    assert.ok(progressRes.answer.includes('The Ember'));
+    assert.ok(progressRes.answer.includes('Antique Pocket Watch'));
+  }
+
+  const indexRes = queryArchivist({
+    question: 'Analyse my Humanity Index.',
+    activeChapter: 'ending',
+    state: { ...partialState, visitedChapters: [...partialState.visitedChapters] },
+  });
+  assert.equal(indexRes.ok, true);
+  if (indexRes.ok) {
+    assert.equal(indexRes.matched, true);
+    assert.ok(indexRes.answer.includes('2/5 decisions recorded'));
+    assert.ok(indexRes.answer.includes('Pending (0 delta counted until you choose)'));
+  }
+
+  const ch4PendingRes = queryArchivist({
+    question: 'What did I decide in chapter 4?',
+    activeChapter: 'ch4',
+    state: { ...partialState, visitedChapters: [...partialState.visitedChapters] },
+  });
+  assert.equal(ch4PendingRes.ok, true);
+  if (ch4PendingRes.ok) {
+    assert.equal(ch4PendingRes.matched, true);
+    assert.ok(ch4PendingRes.answer.includes('have not made a decision in Chapter 04'));
+    assert.ok(!ch4PendingRes.answer.includes('your recorded choice is'));
+  }
+});
+
+await runTest('Archivist (8): Ending explanations distinguish unsealed draft state vs complete 5/5 outcome', () => {
+  const incompleteOutcome = resolvePathOutcome({ ch1: 'share' });
+  const draftEnding = queryArchivist({
+    question: 'What does my ending reveal?',
+    activeChapter: 'ending',
+    state: { ...DEFAULT_ARCHIVE_STATE, decisions: { ch1: 'share' } },
+    outcome: incompleteOutcome,
+  });
+  assert.equal(draftEnding.ok, true);
+  if (draftEnding.ok) {
+    assert.equal(draftEnding.matched, true);
+    assert.ok(draftEnding.answer.includes('not finalized yet'));
+    assert.ok(draftEnding.answer.includes('CH 02, CH 03, CH 04, CH 05'));
+  }
+
+  const fullDecisions = {
+    ch1: 'share' as const,
+    ch2: 'purpose' as const,
+    ch3: 'open' as const,
+    ch4: 'digital_privacy' as const,
+    ch5: 'collaborate' as const,
+  };
+  const sealedOutcome = resolvePathOutcome(fullDecisions);
+  const sealedEnding = queryArchivist({
+    question: 'What does my ending reveal?',
+    activeChapter: 'ending',
+    state: { ...DEFAULT_ARCHIVE_STATE, decisions: fullDecisions },
+    outcome: sealedOutcome,
+  });
+  assert.equal(sealedEnding.ok, true);
+  if (sealedEnding.ok) {
+    assert.equal(sealedEnding.matched, true);
+    assert.ok(sealedEnding.answer.includes(sealedOutcome.archetypeTitle));
+    assert.ok(sealedEnding.answer.includes(sealedOutcome.pathId));
+  }
+});
+
+await runTest('Archivist (9 & 10): Empty input is rejected cleanly and conversation resets cleanly', () => {
+  const empty = queryArchivist({
+    question: '   \n\t  ',
+    activeChapter: 'intro',
+    state: DEFAULT_ARCHIVE_STATE,
+  });
+  assert.equal(empty.ok, false);
+  if (!empty.ok) {
+    assert.equal(empty.code, 'EMPTY_INPUT');
+    assert.ok(empty.error.length > 0);
+  }
+
+  const initial = createInitialArchivistMessages();
+  assert.deepEqual(initial, []);
+
+  const afterConversation = [
+    ...initial,
+    { id: 'u1', role: 'user' as const, text: 'Explain this chapter.' },
+    { id: 'a1', role: 'archivist' as const, text: 'Chapter 01 summary.' },
+  ];
+  assert.equal(afterConversation.length, 2);
+  const cleared = clearArchivistConversation();
+  assert.deepEqual(cleared, []);
 });
 
 console.log(`\nAll ${passed} tests passed.`);

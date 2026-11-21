@@ -485,7 +485,7 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
               className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-medium bg-[#121D17] border border-[#A6C7A9]/50 hover:border-[#A6C7A9] text-[#A6C7A9] rounded transition-colors cursor-pointer whitespace-nowrap"
             >
               <Bot className="w-4 h-4" aria-hidden="true" />
-              <span>Discuss Outcome with Archivist AI</span>
+              <span>Discuss Outcome with The Archivist</span>
             </button>
 
             <button

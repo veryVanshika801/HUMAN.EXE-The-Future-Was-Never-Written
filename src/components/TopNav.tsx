@@ -104,14 +104,14 @@ export const TopNav: React.FC<TopNavProps> = ({
           <button
             type="button"
             onClick={onOpenArchivist}
-            aria-label="Open Archivist AI Assistant"
+            aria-label="Open 2075 Archivist Knowledge Console"
             data-cursor-kind="nav"
-            data-cursor-label="AI"
+            data-cursor-label="ARCHIVIST"
             className="inline-flex items-center gap-1.5 text-[#A6C7A9] hover:text-[#F0F2F2] transition-colors whitespace-nowrap shrink-0 cursor-pointer py-1.5 px-1.5 sm:px-0"
           >
             <Bot className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-            <span className="hidden md:inline">Archivist AI</span>
-            <span className="md:hidden text-[11px] font-mono-archival">AI</span>
+            <span className="hidden md:inline">Archivist</span>
+            <span className="md:hidden text-[11px] font-mono-archival">ARCHIVE</span>
           </button>
 
           <div className="inline-flex items-center gap-1 shrink-0">
@@ -331,7 +331,7 @@ export const TopNav: React.FC<TopNavProps> = ({
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-[#0E1712] border border-[#A6C7A9]/40 text-xs text-[#A6C7A9] cursor-pointer"
                 >
                   <Bot className="w-3.5 h-3.5" aria-hidden="true" />
-                  <span>Ask the 2075 Archivist AI</span>
+                  <span>Ask the 2075 Archivist</span>
                 </button>
                 <button
                   type="button"
