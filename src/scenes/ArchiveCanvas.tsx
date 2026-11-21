@@ -252,6 +252,9 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
     eraPointLight.position.set(1.8, 1.0, 2.5);
     scene.add(eraPointLight);
 
+    const hoverPointLight = new THREE.PointLight('#F0D5A8', 0, 4.8, 1.6);
+    scene.add(hoverPointLight);
+
     // Subtle Volumetric-Looking Overhead Light Beam Cone across eras
     const eraBeamMat = new THREE.MeshBasicMaterial({
       color: '#BFC7CB',
@@ -1321,14 +1324,53 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
     lostLookup.set('lost-005', lost005);
     scene.add(ch5Group);
 
+    // Chapter-Completion Resonance Halos (subtle grounded aura when era decision locked)
+    const chCompletionRings: Record<'ch1' | 'ch2' | 'ch3' | 'ch4' | 'ch5', THREE.Mesh> = {
+      ch1: new THREE.Mesh(
+        new THREE.TorusGeometry(2.75, 0.012, 10, 84),
+        new THREE.MeshBasicMaterial({ color: '#D9822B', transparent: true, opacity: 0.42 })
+      ),
+      ch2: new THREE.Mesh(
+        new THREE.TorusGeometry(2.85, 0.012, 10, 84),
+        new THREE.MeshBasicMaterial({ color: '#D9822B', transparent: true, opacity: 0.42 })
+      ),
+      ch3: new THREE.Mesh(
+        new THREE.TorusGeometry(2.75, 0.012, 10, 84),
+        new THREE.MeshBasicMaterial({ color: '#A6C7A9', transparent: true, opacity: 0.45 })
+      ),
+      ch4: new THREE.Mesh(
+        new THREE.TorusGeometry(2.85, 0.012, 10, 84),
+        new THREE.MeshBasicMaterial({ color: '#A6C7A9', transparent: true, opacity: 0.45 })
+      ),
+      ch5: new THREE.Mesh(
+        new THREE.TorusGeometry(2.9, 0.013, 10, 84),
+        new THREE.MeshBasicMaterial({ color: '#F0F2F2', transparent: true, opacity: 0.48 })
+      ),
+    };
+    const chGroupLookup: Record<'ch1' | 'ch2' | 'ch3' | 'ch4' | 'ch5', THREE.Group> = {
+      ch1: ch1Group,
+      ch2: ch2Group,
+      ch3: ch3Group,
+      ch4: ch4Group,
+      ch5: ch5Group,
+    };
+    (Object.keys(chCompletionRings) as Array<'ch1' | 'ch2' | 'ch3' | 'ch4' | 'ch5'>).forEach((k) => {
+      const ring = chCompletionRings[k];
+      ring.rotation.x = Math.PI / 2;
+      ring.position.y = -1.65;
+      ring.visible = false;
+      chGroupLookup[k].add(ring);
+    });
+
     // =========================================================================
-    // 6. ENDING GROUP: Three Visually Distinct 2075 Worlds
+    // 6. ENDING GROUP: Five Visually Distinct 2075 Worlds
     // =========================================================================
     const endingGroup = new THREE.Group();
     const endPlatform = new THREE.Mesh(new THREE.CylinderGeometry(3.8, 4.2, 0.25, 36), darkTitaniumMat);
     endPlatform.position.y = -1.75;
     endingGroup.add(endPlatform);
 
+    // 1. THE HUMAN RENAISSANCE
     const worldRenaissance = new THREE.Group();
     const renRingTerrace1 = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 3.1, 0.18, 36), brushedSilverMat);
     renRingTerrace1.position.y = -1.52;
@@ -1348,22 +1390,61 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
     renCanopy.frustumCulled = false;
     worldRenaissance.add(renRingTerrace1, renRingTerrace2, renPavilionCore, renSunHalo, renCanopy);
 
-    const worldDominion = new THREE.Group();
+    // 2. THE MACHINE DEPENDENCY
+    const worldMachineDependency = new THREE.Group();
     const domMonoliths = new THREE.InstancedMesh(new THREE.BoxGeometry(0.32, 1, 0.32), darkIronMat, 28);
     domMonoliths.frustumCulled = false;
     const domObelisk = new THREE.Mesh(new THREE.OctahedronGeometry(0.68, 0), darkTitaniumMat);
-    domObelisk.scale.set(0.75, 2.2, 0.75);
+    domObelisk.scale.set(0.75, 2.25, 0.75);
     const domEye = new THREE.Mesh(
       new THREE.SphereGeometry(0.24, 24, 24),
-      new THREE.MeshStandardMaterial({ color: '#C95D3A', emissive: '#C95D3A', emissiveIntensity: 2.4 })
+      new THREE.MeshStandardMaterial({ color: '#D9822B', emissive: '#C95D3A', emissiveIntensity: 2.3 })
     );
     const domScannerRing = new THREE.Mesh(
-      new THREE.TorusGeometry(1.85, 0.025, 10, 64),
-      new THREE.MeshStandardMaterial({ color: '#C95D3A', emissive: '#C95D3A', emissiveIntensity: 1.4 })
+      new THREE.TorusGeometry(1.88, 0.026, 10, 64),
+      new THREE.MeshStandardMaterial({ color: '#D9822B', emissive: '#C95D3A', emissiveIntensity: 1.45 })
     );
     domScannerRing.rotation.x = Math.PI / 2.2;
-    worldDominion.add(domMonoliths, domObelisk, domEye, domScannerRing);
+    const domOuterLattice = new THREE.Mesh(
+      new THREE.TorusGeometry(2.35, 0.012, 8, 72),
+      darkTitaniumMat
+    );
+    domOuterLattice.rotation.x = Math.PI / 2;
+    worldMachineDependency.add(domMonoliths, domObelisk, domEye, domScannerRing, domOuterLattice);
 
+    // 3. THE DIVIDED NETWORK
+    const worldDividedNetwork = new THREE.Group();
+    const divHemiLeft = new THREE.Mesh(
+      new THREE.SphereGeometry(0.66, 28, 28, 0, Math.PI),
+      brassMat
+    );
+    divHemiLeft.position.set(-0.42, 0.05, 0);
+    divHemiLeft.rotation.y = Math.PI * 0.15;
+    const divHemiRight = new THREE.Mesh(
+      new THREE.SphereGeometry(0.66, 28, 28, Math.PI, Math.PI),
+      darkTitaniumMat
+    );
+    divHemiRight.position.set(0.42, -0.05, 0);
+    divHemiRight.rotation.y = -Math.PI * 0.15;
+    const divSplitRingA = new THREE.Mesh(
+      new THREE.TorusGeometry(1.62, 0.024, 10, 48, Math.PI * 0.85),
+      emberMat
+    );
+    divSplitRingA.rotation.set(Math.PI / 2.6, 0.25, 0.1);
+    const divSplitRingB = new THREE.Mesh(
+      new THREE.TorusGeometry(1.78, 0.022, 10, 48, Math.PI * 0.85),
+      brushedSilverMat
+    );
+    divSplitRingB.rotation.set(Math.PI / 2.6, 0.25, Math.PI + 0.15);
+    const divClusterShards = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(0.24, 0.65, 0.24),
+      darkIronMat,
+      20
+    );
+    divClusterShards.frustumCulled = false;
+    worldDividedNetwork.add(divHemiLeft, divHemiRight, divSplitRingA, divSplitRingB, divClusterShards);
+
+    // 4. THE SYMBIOTIC FUTURE
     const worldSymbiotic = new THREE.Group();
     const symTorus = new THREE.Mesh(new THREE.TorusGeometry(1.65, 0.14, 16, 64), brushedSilverMat);
     symTorus.rotation.x = Math.PI / 2.3;
@@ -1379,7 +1460,33 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
     symBioNodes.frustumCulled = false;
     worldSymbiotic.add(symTorus, symCore, symInnerSeed, symOrbitRing, symBioNodes);
 
-    endingGroup.add(worldRenaissance, worldDominion, worldSymbiotic);
+    // 5. THE LOST CONNECTION
+    const worldLostConnection = new THREE.Group();
+    const lostHollowShell = new THREE.Mesh(new THREE.IcosahedronGeometry(0.72, 1), holoWireMat);
+    const lostDimEmber = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.16, 0),
+      new THREE.MeshStandardMaterial({ color: '#899398', emissive: '#D9822B', emissiveIntensity: 0.65, roughness: 0.6 })
+    );
+    const lostStaticRing = new THREE.Mesh(
+      new THREE.TorusGeometry(1.75, 0.015, 10, 72),
+      new THREE.MeshStandardMaterial({ color: '#5F6B72', metalness: 0.6, roughness: 0.55 })
+    );
+    lostStaticRing.rotation.x = Math.PI / 2.15;
+    const lostDrifters = new THREE.InstancedMesh(
+      new THREE.CylinderGeometry(0.08, 0.12, 0.75, 6),
+      brushedSilverMat,
+      16
+    );
+    lostDrifters.frustumCulled = false;
+    worldLostConnection.add(lostHollowShell, lostDimEmber, lostStaticRing, lostDrifters);
+
+    endingGroup.add(
+      worldRenaissance,
+      worldMachineDependency,
+      worldDividedNetwork,
+      worldSymbiotic,
+      worldLostConnection
+    );
     scene.add(endingGroup);
 
     // =========================================================================
@@ -1729,7 +1836,7 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
         }
       });
 
-      // Physical hover highlight subtle scale feedback + gentle individual floating motion
+      // Physical hover highlight subtle scale feedback + gentle individual floating motion + hover light
       let bobIdx = 0;
       artifactLookup.forEach((obj, id) => {
         const isHovered = hoveredObjectId === id || s.focusedArtifactId === id;
@@ -1740,6 +1847,33 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
           obj.position.y = baseY + Math.sin(elapsed * 1.15 + bobIdx * 0.9) * 0.042 * motionMul;
         }
         bobIdx++;
+      });
+
+      const hoveredObj =
+        (hoveredObjectId &&
+          (artifactLookup.get(hoveredObjectId) ||
+            lostLookup.get(hoveredObjectId) ||
+            secretLookup.get(hoveredObjectId))) ||
+        null;
+      if (hoveredObj && isObjectEffectivelyVisible(hoveredObj)) {
+        hoveredObj.getWorldPosition(_v1);
+        hoverPointLight.position.x = THREE.MathUtils.damp(hoverPointLight.position.x, _v1.x, 9, delta);
+        hoverPointLight.position.y = THREE.MathUtils.damp(hoverPointLight.position.y, _v1.y + 0.35, 9, delta);
+        hoverPointLight.position.z = THREE.MathUtils.damp(hoverPointLight.position.z, _v1.z + 0.85, 9, delta);
+        hoverPointLight.intensity = THREE.MathUtils.damp(hoverPointLight.intensity, 1.85, 8, delta);
+      } else {
+        hoverPointLight.intensity = THREE.MathUtils.damp(hoverPointLight.intensity, 0, 8, delta);
+      }
+
+      // Chapter-completion resonance halos
+      (['ch1', 'ch2', 'ch3', 'ch4', 'ch5'] as const).forEach((chKey) => {
+        const ring = chCompletionRings[chKey];
+        const completed = Boolean(s.decisions[chKey]);
+        ring.visible = completed;
+        if (completed) {
+          const pulse = 1 + Math.sin(elapsed * 1.6) * 0.018 * motionMul;
+          ring.scale.set(pulse, pulse, 1);
+        }
       });
 
       // Era Atmosphere & What-If / Consequence Shifts + Volumetric Light Beam
@@ -2065,13 +2199,15 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
         neuralPulses.instanceMatrix.needsUpdate = true;
       }
 
-      // --- ENDING WORLDS ---
+      // --- ENDING WORLDS (5 Distinct 2075 Architectures) ---
       if (s.activeChapter === 'ending') {
         const arch = s.endingOutcome.archetype;
         const vv = s.endingOutcome.visualVariation;
         worldRenaissance.visible = arch === 'renaissance';
-        worldDominion.visible = arch === 'dominion';
+        worldMachineDependency.visible = arch === 'machine_dependency';
+        worldDividedNetwork.visible = arch === 'divided_network';
         worldSymbiotic.visible = arch === 'symbiotic';
+        worldLostConnection.visible = arch === 'lost_connection';
         endingGroup.rotation.y = scrollRot * 0.35 + elapsed * 0.08 * motionMul;
 
         if (arch === 'renaissance') {
@@ -2090,8 +2226,9 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
             renCanopy.setMatrixAt(i, dummy.matrix);
           }
           renCanopy.instanceMatrix.needsUpdate = true;
-        } else if (arch === 'dominion') {
-          domScannerRing.rotation.z -= delta * 0.55 * vv.ringSpeed * motionMul;
+        } else if (arch === 'machine_dependency') {
+          domScannerRing.rotation.z -= delta * 0.58 * vv.ringSpeed * motionMul;
+          domOuterLattice.rotation.z += delta * 0.14 * motionMul;
           const visM = Math.max(10, Math.round(28 * vv.structureDensity));
           for (let i = 0; i < 28; i++) {
             if (i < visM) {
@@ -2108,7 +2245,27 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
             domMonoliths.setMatrixAt(i, dummy.matrix);
           }
           domMonoliths.instanceMatrix.needsUpdate = true;
-        } else {
+        } else if (arch === 'divided_network') {
+          divSplitRingA.rotation.z += delta * 0.36 * vv.ringSpeed * motionMul;
+          divSplitRingB.rotation.z -= delta * 0.24 * vv.ringSpeed * motionMul;
+          for (let i = 0; i < 20; i++) {
+            const side = i < 10 ? -1 : 1;
+            const localIdx = i % 10;
+            const a = (localIdx / 10) * Math.PI - Math.PI / 2;
+            const r = 1.35 + (localIdx % 3) * 0.48;
+            const h = 0.7 + (localIdx % 4) * 0.35;
+            dummy.position.set(
+              side * (0.65 + Math.abs(Math.cos(a)) * r),
+              -1.45 + h * 0.45 + Math.sin(elapsed * 0.7 + i) * 0.04 * motionMul,
+              Math.sin(a) * r
+            );
+            dummy.scale.set(1, h, 1);
+            dummy.rotation.set(0, a * side, 0);
+            dummy.updateMatrix();
+            divClusterShards.setMatrixAt(i, dummy.matrix);
+          }
+          divClusterShards.instanceMatrix.needsUpdate = true;
+        } else if (arch === 'symbiotic') {
           symOrbitRing.rotation.z += delta * 0.42 * vv.ringSpeed * motionMul;
           symTorus.rotation.z -= delta * 0.18 * motionMul;
           for (let i = 0; i < 20; i++) {
@@ -2119,6 +2276,25 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
             symBioNodes.setMatrixAt(i, dummy.matrix);
           }
           symBioNodes.instanceMatrix.needsUpdate = true;
+        } else {
+          // lost_connection
+          lostHollowShell.rotation.y += delta * 0.12 * motionMul;
+          lostDimEmber.rotation.x += delta * 0.25 * motionMul;
+          lostStaticRing.rotation.z -= delta * 0.08 * motionMul;
+          for (let i = 0; i < 16; i++) {
+            const a = (i / 16) * Math.PI * 2 + elapsed * 0.04 * motionMul;
+            const r = 2.35 + (i % 3) * 0.45;
+            dummy.position.set(
+              Math.cos(a) * r,
+              -0.95 + ((i % 4) - 1.5) * 0.42 + Math.sin(elapsed * 0.5 + i) * 0.06 * motionMul,
+              Math.sin(a) * r
+            );
+            dummy.scale.setScalar(0.85);
+            dummy.rotation.set(0.15 * (i % 3), a, 0.12);
+            dummy.updateMatrix();
+            lostDrifters.setMatrixAt(i, dummy.matrix);
+          }
+          lostDrifters.instanceMatrix.needsUpdate = true;
         }
       }
 
@@ -2183,6 +2359,19 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
       } else if (s.activeChapter === 'credits') {
         _v1.set(pointerX * 0.28 * motionMul, 0.12 + pointerY * 0.18 * motionMul, 5.8);
         _v2.set(0, 0, 0);
+      } else if (s.activeChapter === 'ending') {
+        const archCamZ =
+          s.endingOutcome.archetype === 'lost_connection'
+            ? 7.6
+            : s.endingOutcome.archetype === 'machine_dependency'
+            ? 6.9
+            : 6.5;
+        _v1.set(
+          pointerX * 0.38 * motionMul,
+          0.42 + pointerY * 0.24 * motionMul - s.chapterProgress * 0.25,
+          archCamZ
+        );
+        _v2.set(isDesktop ? 0.45 : 0, 0, 0);
       } else {
         const stageZShift = (s.stageIndex - 1) * 0.16;
         _v1.set(

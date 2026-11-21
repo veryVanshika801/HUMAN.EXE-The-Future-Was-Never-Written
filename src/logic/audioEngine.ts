@@ -13,8 +13,12 @@ export type ArchiveSfxType =
   | 'neuralPulse'
   | 'glitch'
   | 'repairSuccess'
+  | 'fragmentSnap'
   | 'decision'
   | 'sphereOpen'
+  | 'portalTransition'
+  | 'chapterUnlock'
+  | 'endingReveal'
   | 'transitionWhoosh'
   | 'metallicResonance'
   | 'secret'
@@ -201,12 +205,15 @@ class ArchiveAudioEngine {
 
   public setEra(era: ChapterId, archetype?: EndingArchetype) {
     const changed = this.currentEra !== era;
+    const archChanged = this.currentArchetype !== archetype;
     this.currentEra = era;
     this.currentArchetype = archetype;
     if (!this.settings.enabled || !this.ctx) return;
     this.applyEraTone(era, archetype);
     if (changed) {
-      this.playEraSound('transitionWhoosh');
+      this.playEraSound(era === 'ending' ? 'endingReveal' : 'portalTransition');
+    } else if (era === 'ending' && archChanged) {
+      this.playEraSound('endingReveal');
     }
   }
 
@@ -239,6 +246,67 @@ class ArchiveAudioEngine {
       } catch {
         // ignore
       }
+    }
+  }
+
+  private getEndingPreset(archetype?: EndingArchetype) {
+    switch (archetype) {
+      case 'machine_dependency':
+        return {
+          f1: 48.99,
+          f2: 73.42,
+          m1: 98.0,
+          m2: 116.54,
+          cutoff: 290,
+          mCutoff: 410,
+          noiseFreq: 260,
+          noise: 0.085,
+        };
+      case 'divided_network':
+        return {
+          f1: 58.27,
+          f2: 87.31,
+          m1: 116.54,
+          m2: 164.81,
+          cutoff: 390,
+          mCutoff: 540,
+          noiseFreq: 690,
+          noise: 0.065,
+        };
+      case 'lost_connection':
+        return {
+          f1: 43.65,
+          f2: 65.41,
+          m1: 87.31,
+          m2: 130.81,
+          cutoff: 205,
+          mCutoff: 320,
+          noiseFreq: 950,
+          noise: 0.07,
+        };
+      case 'renaissance':
+        return {
+          f1: 65.41,
+          f2: 98.0,
+          m1: 130.81,
+          m2: 164.81,
+          cutoff: 760,
+          mCutoff: 960,
+          noiseFreq: 720,
+          noise: 0.042,
+        };
+      case 'symbiotic':
+      default:
+        return {
+          f1: 73.42,
+          f2: 110.0,
+          m1: 146.83,
+          m2: 220.0,
+          cutoff: 690,
+          mCutoff: 860,
+          noiseFreq: 540,
+          noise: 0.04,
+        };
     }
   }
 
@@ -331,39 +399,7 @@ class ArchiveAudioEngine {
         noiseFreq: 620,
         noise: 0.035,
       },
-      ending:
-        archetype === 'dominion'
-          ? {
-              f1: 55,
-              f2: 77.78,
-              m1: 110,
-              m2: 130.81,
-              cutoff: 300,
-              mCutoff: 440,
-              noiseFreq: 280,
-              noise: 0.08,
-            }
-          : archetype === 'renaissance'
-          ? {
-              f1: 65.41,
-              f2: 98.0,
-              m1: 130.81,
-              m2: 164.81,
-              cutoff: 760,
-              mCutoff: 960,
-              noiseFreq: 720,
-              noise: 0.045,
-            }
-          : {
-              f1: 73.42,
-              f2: 110.0,
-              m1: 146.83,
-              m2: 220.0,
-              cutoff: 690,
-              mCutoff: 860,
-              noiseFreq: 540,
-              noise: 0.04,
-            },
+      ending: this.getEndingPreset(archetype),
       credits: {
         f1: 65.41,
         f2: 98.0,
@@ -397,7 +433,13 @@ class ArchiveAudioEngine {
 
   public playEraSound(type: ArchiveSfxType) {
     if (!this.settings.enabled || this.settings.muted || this.freezeSilence) return;
-    if (!this.canPlay(type, type === 'hover' ? 140 : type === 'transitionWhoosh' ? 750 : 65)) return;
+    const cooldown =
+      type === 'hover'
+        ? 140
+        : type === 'transitionWhoosh' || type === 'portalTransition'
+        ? 700
+        : 65;
+    if (!this.canPlay(type, cooldown)) return;
 
     this.initContext();
     if (!this.ctx || !this.sfxGain) return;
@@ -409,6 +451,21 @@ class ArchiveAudioEngine {
 
     if (type === 'discovery') {
       this.playLostArtifactFanfare();
+      return;
+    }
+
+    if (type === 'endingReveal') {
+      this.triggerSequence([220, 329.63, 440, 659.25], 'sine', 0.11, 0.22);
+      return;
+    }
+
+    if (type === 'chapterUnlock') {
+      this.triggerSequence([261.63, 392.0, 523.25], 'triangle', 0.085, 0.14);
+      return;
+    }
+
+    if (type === 'fragmentSnap') {
+      this.triggerSweep(420, 860, 'sine', 0.09, 0.12);
       return;
     }
 
@@ -428,7 +485,7 @@ class ArchiveAudioEngine {
       return;
     }
 
-    if (type === 'transitionWhoosh') {
+    if (type === 'transitionWhoosh' || type === 'portalTransition') {
       this.triggerNoiseBurst(440, 0.1, 0.42);
       this.triggerSweep(160, 310, 'sine', 0.07, 0.38);
       return;

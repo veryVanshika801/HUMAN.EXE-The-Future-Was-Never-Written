@@ -6,16 +6,22 @@ import {
   GitCompare,
   X,
   ArrowUpRight,
+  Activity,
 } from 'lucide-react';
 import {
   ArchiveProgressState,
   ChapterId,
   DecisionsState,
+  EndingArchetype,
   PathOutcome,
 } from '../types/archive';
 import { CHAPTERS } from '../data/chapters';
 import { ARTIFACTS, CORRUPTED_FILES, LOST_ARTIFACTS, SECRET_MEMORIES } from '../data/artifacts';
-import { getAll48PathsSummary, resolvePathOutcome } from '../logic/decisionEngine';
+import {
+  calculateLiveHumanityIndex,
+  getAll48PathsSummary,
+  resolvePathOutcome,
+} from '../logic/decisionEngine';
 
 interface EndingSectionProps {
   state: ArchiveProgressState;
@@ -26,6 +32,77 @@ interface EndingSectionProps {
   onReplay: (keepCollection: boolean) => void;
 }
 
+interface RadialGaugeProps {
+  label: string;
+  subtitle: string;
+  value: number;
+  bonus: number;
+  strokeHex: string;
+}
+
+const RadialHumanityGauge: React.FC<RadialGaugeProps> = ({
+  label,
+  subtitle,
+  value,
+  bonus,
+  strokeHex,
+}) => {
+  const radius = 36;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - value / 100);
+
+  return (
+    <div className="p-4 rounded-xl bg-[#090B0D] border border-white/10 flex items-center gap-4">
+      <svg width="88" height="88" viewBox="0 0 88 88" className="shrink-0" role="img" aria-label={`${label}: ${value}%`}>
+        <circle
+          cx="44"
+          cy="44"
+          r={radius}
+          fill="none"
+          stroke="rgba(255,255,255,0.08)"
+          strokeWidth="6"
+        />
+        <circle
+          cx="44"
+          cy="44"
+          r={radius}
+          fill="none"
+          stroke={strokeHex}
+          strokeWidth="6"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          transform="rotate(-90 44 44)"
+          style={{ transition: 'stroke-dashoffset 600ms cubic-bezier(0.22, 1, 0.36, 1)' }}
+        />
+        <text
+          x="44"
+          y="48"
+          textAnchor="middle"
+          fill="#F0F2F2"
+          fontSize="16"
+          fontWeight="600"
+          fontFamily="IBM Plex Mono, monospace"
+        >
+          {value}%
+        </text>
+      </svg>
+
+      <div className="min-w-0">
+        <div className="text-xs font-mono-archival tracking-wider text-[#F0F2F2] font-semibold">
+          {label}
+        </div>
+        <div className="text-[11px] text-[#899398] mt-0.5 leading-snug">{subtitle}</div>
+        {bonus > 0 && (
+          <div className="text-[10px] font-mono-archival text-[#A6C7A9] mt-1.5">
+            +{bonus}% from Archive Discovery
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const EndingSection: React.FC<EndingSectionProps> = ({
   state,
   outcome,
@@ -35,6 +112,7 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
   onReplay,
 }) => {
   const [compareOpen, setCompareOpen] = useState(false);
+  const [archetypeFilter, setArchetypeFilter] = useState<EndingArchetype | 'all'>('all');
   const [simDecisions, setSimDecisions] = useState<Required<DecisionsState>>({
     ch1: state.decisions.ch1 ?? 'share',
     ch2: state.decisions.ch2 ?? 'purpose',
@@ -43,7 +121,19 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
     ch5: state.decisions.ch5 ?? 'collaborate',
   });
 
+  const humanityIndex = useMemo(
+    () => calculateLiveHumanityIndex(state.decisions, state),
+    [state]
+  );
+
   const all48Paths = useMemo(() => getAll48PathsSummary(), []);
+  const filtered48Paths = useMemo(
+    () =>
+      archetypeFilter === 'all'
+        ? all48Paths
+        : all48Paths.filter((p) => p.archetype === archetypeFilter),
+    [all48Paths, archetypeFilter]
+  );
   const simulatedOutcome = useMemo(() => resolvePathOutcome(simDecisions), [simDecisions]);
 
   const handleDownloadReport = () => {
@@ -55,10 +145,11 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
       `Ending Archetype: ${outcome.archetypeTitle}`,
       `Path Title: ${outcome.pathTitle}`,
       '',
-      'INFLUENCE SCORES',
-      `- Human Agency: ${outcome.scores.humanAgency}%`,
-      `- Machine Automation: ${outcome.scores.machineAutomation}%`,
-      `- Symbiotic Synthesis: ${outcome.scores.symbioticSynthesis}%`,
+      'HUMANITY INDEX',
+      `- Innovation: ${humanityIndex.innovation}%`,
+      `- Connection: ${humanityIndex.connection}%`,
+      `- Human Agency: ${humanityIndex.humanAgency}%`,
+      `- Composite Balance: ${humanityIndex.overallScore}%`,
       '',
       'HISTORICAL SUMMARY',
       outcome.historicalSummary,
@@ -94,11 +185,11 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
       aria-labelledby="ending-heading"
       className="relative min-h-screen py-24 sm:py-32 px-4 sm:px-10 lg:px-16 z-10 pointer-events-none"
     >
-      <div className="max-w-3xl pointer-events-auto space-y-8">
+      <div className="max-w-4xl pointer-events-auto space-y-8">
         {/* Ending Archetype Reveal */}
         <div className="print-report bg-[#090B0D]/92 border border-white/15 rounded-xl p-6 sm:p-10">
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono-archival text-[#A6C7A9]">
-            <span>ARCHIVE CORE · YEAR 2075 SIMULATION</span>
+            <span>ARCHIVE CORE · YEAR 2075 SIMULATION · 5 CONVERGENT FUTURES</span>
             <span>PATH {String(outcome.pathIndex).padStart(2, '0')} OF 48</span>
           </div>
 
@@ -129,15 +220,18 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
           </div>
         </div>
 
-        {/* Personalized Archivist Profile Card */}
+        {/* HUMANITY INDEX + Personalized Archivist Report */}
         <div className="print-report bg-[#111619]/95 border border-white/15 rounded-xl p-6 sm:p-8">
           <div className="flex flex-wrap items-start justify-between gap-4 pb-5 border-b border-white/10">
             <div>
-              <div className="text-xs font-mono-archival text-[#899398]">PERSONALIZED ARCHIVIST PROFILE</div>
+              <div className="inline-flex items-center gap-1.5 text-xs font-mono-archival text-[#A6C7A9]">
+                <Activity className="w-3.5 h-3.5" />
+                <span>THE HUMANITY INDEX · ARCHIVE PROFILE {outcome.pathId}</span>
+              </div>
               <h3 className="font-display text-2xl font-semibold text-[#F0F2F2] mt-1">
-                {outcome.pathId}
+                Three Axes of 2075 Civilization
               </h3>
-              <div className="text-xs font-mono-archival text-[#A6C7A9] mt-1">
+              <div className="text-xs font-mono-archival text-[#899398] mt-1">
                 {outcome.visualVariation.atmosphereNote}
               </div>
             </div>
@@ -147,32 +241,39 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
             </div>
           </div>
 
-          {/* Influence Scores */}
-          <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {[
-              { label: 'Human Agency', value: outcome.scores.humanAgency, color: 'bg-[#A6C7A9]' },
-              { label: 'Machine Automation', value: outcome.scores.machineAutomation, color: 'bg-[#C95D3A]' },
-              { label: 'Symbiotic Synthesis', value: outcome.scores.symbioticSynthesis, color: 'bg-[#BFC7CB]' },
-            ].map((score) => (
-              <div key={score.label} className="p-3.5 rounded-lg bg-[#090B0D] border border-white/10">
-                <div className="flex items-center justify-between text-xs text-[#BFC7CB]">
-                  <span>{score.label}</span>
-                  <span className="font-mono-archival tabular-nums text-[#F0F2F2]">{score.value}%</span>
-                </div>
-                <div className="mt-2.5 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                  <div className={`h-full ${score.color}`} style={{ width: `${score.value}%` }} />
-                </div>
-              </div>
-            ))}
+          {/* 3 Circular Humanity Index Gauges */}
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <RadialHumanityGauge
+              label="INNOVATION"
+              subtitle="Technological momentum & artifacts examined"
+              value={humanityIndex.innovation}
+              bonus={humanityIndex.explorationBonuses.innovation}
+              strokeHex="#D9822B"
+            />
+            <RadialHumanityGauge
+              label="CONNECTION"
+              subtitle="Shared culture, openness & recovered memories"
+              value={humanityIndex.connection}
+              bonus={humanityIndex.explorationBonuses.connection}
+              strokeHex="#BFC7CB"
+            />
+            <RadialHumanityGauge
+              label="HUMAN AGENCY"
+              subtitle="Mortal autonomy, purpose & repaired records"
+              value={humanityIndex.humanAgency}
+              bonus={humanityIndex.explorationBonuses.humanAgency}
+              strokeHex="#A6C7A9"
+            />
           </div>
 
-          {/* 5 Recorded Choices */}
+          {/* Butterfly Effect Per-Decision Attribution Breakdown */}
           <div className="mt-6 pt-5 border-t border-white/10">
             <div className="text-xs font-mono-archival text-[#899398] uppercase tracking-wider mb-3">
-              Recorded Decisions & Unlocked Memories
+              Butterfly Effect · Decision Lineage &amp; Index Deltas
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
               {CHAPTERS.map((ch, idx) => {
+                const factor = humanityIndex.decisionFactors[idx];
                 const val = state.decisions[ch.id];
                 const opt = ch.options.find((o) => o.value === val);
                 return (
@@ -180,18 +281,29 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
                     key={ch.id}
                     type="button"
                     onClick={() => onNavigateChapter(ch.id)}
-                    className="text-left p-3 rounded-lg bg-[#090B0D] border border-white/10 hover:border-[#A6C7A9]/60 transition-colors cursor-pointer"
+                    className="museum-card-hover text-left p-3 rounded-lg bg-[#090B0D] border border-white/10 hover:border-[#A6C7A9]/60 cursor-pointer flex flex-col justify-between gap-2"
                   >
-                    <div className="flex items-center justify-between text-[11px] font-mono-archival text-[#899398]">
-                      <span>CH 0{ch.number}</span>
-                      <ArrowUpRight className="w-3 h-3" />
+                    <div>
+                      <div className="flex items-center justify-between text-[11px] font-mono-archival text-[#899398]">
+                        <span>CH 0{ch.number}</span>
+                        <ArrowUpRight className="w-3 h-3" />
+                      </div>
+                      <div className="text-xs font-medium text-[#F0F2F2] mt-1">
+                        {opt ? opt.label : factor?.optionLabel ?? 'Defaulted'}
+                      </div>
+                      <div className="text-[10px] text-[#A6C7A9] mt-1 truncate">
+                        {outcome.unlockedMemories[idx]}
+                      </div>
                     </div>
-                    <div className="text-xs font-medium text-[#F0F2F2] mt-1">
-                      {opt ? opt.label : 'Defaulted'}
-                    </div>
-                    <div className="text-[11px] text-[#A6C7A9] mt-1 truncate">
-                      {outcome.unlockedMemories[idx]}
-                    </div>
+                    {factor && (
+                      <div className="pt-2 border-t border-white/8 text-[10px] font-mono-archival text-[#899398] space-x-1.5">
+                        <span>INN {factor.innovationDelta >= 0 ? `+${factor.innovationDelta}` : factor.innovationDelta}</span>
+                        <span>·</span>
+                        <span>CON {factor.connectionDelta >= 0 ? `+${factor.connectionDelta}` : factor.connectionDelta}</span>
+                        <span>·</span>
+                        <span>AGN {factor.agencyDelta >= 0 ? `+${factor.agencyDelta}` : factor.agencyDelta}</span>
+                      </div>
+                    )}
                   </button>
                 );
               })}
@@ -222,11 +334,12 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
           <div className="no-print mt-6 pt-5 border-t border-white/10 flex flex-wrap items-center gap-3">
             <button
               type="button"
+              data-magnetic="true"
               onClick={() => setCompareOpen(true)}
               className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-medium bg-[#F0F2F2] hover:bg-[#A6C7A9] text-[#090B0D] rounded transition-colors cursor-pointer whitespace-nowrap"
             >
               <GitCompare className="w-4 h-4" aria-hidden="true" />
-              <span>Compare Decisions (48 Paths)</span>
+              <span>Explore 48 Paths &amp; 5 Endings</span>
             </button>
 
             <button
@@ -249,6 +362,7 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
 
             <button
               type="button"
+              data-magnetic="true"
               onClick={() => onReplay(true)}
               className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-medium bg-[#090B0D] border border-[#D9822B]/50 hover:border-[#D9822B] text-[#D9822B] rounded transition-colors cursor-pointer whitespace-nowrap"
             >
@@ -269,22 +383,26 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
         </footer>
       </div>
 
-      {/* Compare Decisions 48-Path Explorer Modal */}
+      {/* Compare Decisions 48-Path & 5-Ending Explorer Modal */}
       {compareOpen && (
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby="compare-paths-title"
           className="no-print fixed inset-0 z-50 bg-[#090B0D]/95 flex items-center justify-center p-4 sm:p-8 overflow-y-auto pointer-events-auto"
+          onClick={() => setCompareOpen(false)}
         >
-          <div className="w-full max-w-5xl bg-[#111619] border border-white/15 rounded-xl p-6 sm:p-8 my-auto max-h-[90vh] overflow-y-auto">
+          <div
+            className="modal-reveal w-full max-w-5xl bg-[#111619] border border-white/15 rounded-xl p-6 sm:p-8 my-auto max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-start justify-between gap-4 pb-5 border-b border-white/10">
               <div>
                 <div className="text-xs font-mono-archival text-[#A6C7A9]">
-                  BRANCHING DECISION ENGINE · 2 × 2 × 2 × 2 × 3 = 48 OUTCOMES
+                  BRANCHING DECISION ENGINE · 48 TIMELINES · 5 ENDINGS
                 </div>
                 <h2 id="compare-paths-title" className="font-display text-2xl font-semibold text-[#F0F2F2] mt-1">
-                  Compare Decisions & Explore All 48 Timelines
+                  Compare Decisions &amp; Explore All 48 Timelines
                 </h2>
               </div>
               <button
@@ -351,27 +469,55 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
 
                 <div className="pt-4 border-t border-white/10 grid grid-cols-3 gap-2 text-xs font-mono-archival">
                   <div>
-                    <div className="text-[#899398]">Human</div>
+                    <div className="text-[#899398]">Innovation</div>
+                    <div className="text-[#D9822B]">{simulatedOutcome.scores.innovation}%</div>
+                  </div>
+                  <div>
+                    <div className="text-[#899398]">Connection</div>
+                    <div className="text-[#BFC7CB]">{simulatedOutcome.scores.connection}%</div>
+                  </div>
+                  <div>
+                    <div className="text-[#899398]">Agency</div>
                     <div className="text-[#A6C7A9]">{simulatedOutcome.scores.humanAgency}%</div>
-                  </div>
-                  <div>
-                    <div className="text-[#899398]">Machine</div>
-                    <div className="text-[#C95D3A]">{simulatedOutcome.scores.machineAutomation}%</div>
-                  </div>
-                  <div>
-                    <div className="text-[#899398]">Symbiotic</div>
-                    <div className="text-[#F0F2F2]">{simulatedOutcome.scores.symbioticSynthesis}%</div>
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="mt-8 pt-6 border-t border-white/10">
-              <div className="text-xs font-mono-archival text-[#899398] mb-3">
-                COMPLETE 48-TIMELINE ARCHIVE INDEX (CLICK ANY PATH TO LOAD INTO SIMULATOR)
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div className="text-xs font-mono-archival text-[#899398]">
+                  COMPLETE 48-TIMELINE ARCHIVE INDEX ({filtered48Paths.length} SHOWN)
+                </div>
+                <div className="flex flex-wrap gap-1 text-[10px] font-mono-archival">
+                  {(
+                    [
+                      { key: 'all', label: 'ALL (48)' },
+                      { key: 'renaissance', label: 'RENAISSANCE' },
+                      { key: 'symbiotic', label: 'SYMBIOTIC' },
+                      { key: 'divided_network', label: 'DIVIDED' },
+                      { key: 'machine_dependency', label: 'DEPENDENCY' },
+                      { key: 'lost_connection', label: 'LOST CONN.' },
+                    ] as const
+                  ).map((f) => (
+                    <button
+                      key={f.key}
+                      type="button"
+                      onClick={() => setArchetypeFilter(f.key)}
+                      className={`px-2 py-1 rounded border cursor-pointer transition-colors ${
+                        archetypeFilter === f.key
+                          ? 'bg-[#A6C7A9] text-[#090B0D] border-[#A6C7A9] font-semibold'
+                          : 'bg-[#090B0D] text-[#899398] border-white/10 hover:text-[#F0F2F2]'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
               </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-1">
-                {all48Paths.map((p) => {
+                {filtered48Paths.map((p) => {
                   const isCurrentReal = p.pathIndex === outcome.pathIndex;
                   const isSim = p.pathIndex === simulatedOutcome.pathIndex;
                   return (
@@ -387,8 +533,8 @@ export const EndingSection: React.FC<EndingSectionProps> = ({
                           : 'bg-[#090B0D] border-white/8 hover:border-white/25'
                       }`}
                     >
-                      <div className="flex items-center justify-between font-mono-archival text-[11px] text-[#899398]">
-                        <span>#{String(p.pathIndex).padStart(2, '0')} · {p.archetype.toUpperCase()}</span>
+                      <div className="flex items-center justify-between font-mono-archival text-[10px] text-[#899398]">
+                        <span>#{String(p.pathIndex).padStart(2, '0')} · {p.archetype.replace('_', ' ').toUpperCase()}</span>
                         {isCurrentReal && <span className="text-[#A6C7A9]">YOURS</span>}
                       </div>
                       <div className="text-[#F0F2F2] font-medium truncate mt-0.5">{p.pathTitle}</div>

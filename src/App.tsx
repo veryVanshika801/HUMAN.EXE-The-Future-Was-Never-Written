@@ -24,6 +24,7 @@ import { ArchiveCollectionModal } from './components/ArchiveCollectionModal';
 import { EndingSection } from './components/EndingSection';
 import { CreditsSection } from './components/CreditsSection';
 import { SoundControlPanel } from './components/SoundControlPanel';
+import { CustomCursor } from './components/CustomCursor';
 
 const LazyArchiveCanvas = lazy(() => import('./scenes/ArchiveCanvas'));
 
@@ -69,9 +70,26 @@ export function App() {
   const [globeZoom, setGlobeZoom] = useState(1.0);
   const [whatIfPreview, setWhatIfPreview] = useState<{ chapter: number; option: string } | null>(null);
   const [timeFractureActive, setTimeFractureActive] = useState(false);
+  const [cursorBurst, setCursorBurst] = useState<{ type: 'unlock' | 'secret' | 'chapter'; tick: number } | null>(
+    null
+  );
 
   const activeChapterRef = React.useRef<ChapterId>(activeChapter);
   activeChapterRef.current = activeChapter;
+  const timeFractureTimerRef = React.useRef<number | null>(null);
+  const seenChaptersRef = React.useRef<Set<ChapterNumber>>(new Set(state.visitedChapters));
+
+  useEffect(() => {
+    return () => {
+      if (timeFractureTimerRef.current !== null) {
+        window.clearTimeout(timeFractureTimerRef.current);
+      }
+    };
+  }, []);
+
+  const triggerCursorBurst = useCallback((type: 'unlock' | 'secret' | 'chapter') => {
+    setCursorBurst((prev) => ({ type, tick: (prev?.tick ?? 0) + 1 }));
+  }, []);
 
   const endingOutcome = useMemo(() => resolvePathOutcome(state.decisions), [state.decisions]);
 
@@ -99,7 +117,16 @@ export function App() {
           setActiveChapter(id);
           setHoveredTarget(null);
           if (id.startsWith('ch')) {
-            markChapterVisited(Number(id.slice(2)) as ChapterNumber);
+            const num = Number(id.slice(2)) as ChapterNumber;
+            if (!seenChaptersRef.current.has(num)) {
+              seenChaptersRef.current.add(num);
+              audioEngine.playEraSound('chapterUnlock');
+              triggerCursorBurst('chapter');
+            }
+            markChapterVisited(num);
+          } else if (id === 'ending') {
+            audioEngine.playEraSound('endingReveal');
+            triggerCursorBurst('chapter');
           }
         },
         onEnterBack: () => {
@@ -119,12 +146,18 @@ export function App() {
     return () => {
       triggers.forEach((t) => t.kill());
     };
-  }, [markChapterVisited]);
+  }, [markChapterVisited, triggerCursorBurst]);
 
-  const showSecretToast = useCallback((secretId: string) => {
-    const sec = SECRET_MEMORIES.find((s) => s.id === secretId);
-    if (sec) setToastSecret(sec);
-  }, []);
+  const showSecretToast = useCallback(
+    (secretId: string) => {
+      const sec = SECRET_MEMORIES.find((s) => s.id === secretId);
+      if (sec) {
+        setToastSecret(sec);
+        triggerCursorBurst('secret');
+      }
+    },
+    [triggerCursorBurst]
+  );
 
   const handleIntroSceneChange = useCallback((sceneIdx: number, progress: number) => {
     if (activeChapterRef.current === 'intro') {
@@ -163,18 +196,24 @@ export function App() {
     (artifactId: string) => {
       const found = ARTIFACTS.find((a) => a.id === artifactId);
       if (!found) return;
+      if (!state.inspectedArtifacts.includes(found.id)) {
+        triggerCursorBurst('unlock');
+      }
       inspectArtifact(found.id, showSecretToast);
       setSelectedArtifact(found);
     },
-    [inspectArtifact, showSecretToast]
+    [state.inspectedArtifacts, inspectArtifact, showSecretToast, triggerCursorBurst]
   );
 
   const handleSelectArtifactObj = useCallback(
     (artifact: ArtifactItem) => {
+      if (!state.inspectedArtifacts.includes(artifact.id)) {
+        triggerCursorBurst('unlock');
+      }
       inspectArtifact(artifact.id, showSecretToast);
       setSelectedArtifact(artifact);
     },
-    [inspectArtifact, showSecretToast]
+    [state.inspectedArtifacts, inspectArtifact, showSecretToast, triggerCursorBurst]
   );
 
   const handleDiscoverLost = useCallback(
@@ -185,8 +224,9 @@ export function App() {
       if (state.discoveredLostArtifacts.includes(lost.id)) return;
       discoverLostArtifact(lost.id);
       setToastLostArtifact(lost);
+      triggerCursorBurst('secret');
     },
-    [activeChapter, state.discoveredLostArtifacts, discoverLostArtifact]
+    [activeChapter, state.discoveredLostArtifacts, discoverLostArtifact, triggerCursorBurst]
   );
 
   const handleDiscoverSecret = useCallback(
@@ -202,7 +242,13 @@ export function App() {
     audioEngine.playEraSound('transitionWhoosh');
     if (state.reducedMotion) return;
     setTimeFractureActive(true);
-    window.setTimeout(() => setTimeFractureActive(false), 450);
+    if (timeFractureTimerRef.current !== null) {
+      window.clearTimeout(timeFractureTimerRef.current);
+    }
+    timeFractureTimerRef.current = window.setTimeout(() => {
+      setTimeFractureActive(false);
+      timeFractureTimerRef.current = null;
+    }, 450);
   }, [state.reducedMotion]);
 
   const handleNavigateArtifact = useCallback(
@@ -221,8 +267,9 @@ export function App() {
   const handleSelectDecision = useCallback(
     (chapterId: `ch${1 | 2 | 3 | 4 | 5}`, value: string) => {
       setDecision(chapterId, value as DecisionsState[typeof chapterId]);
+      triggerCursorBurst('unlock');
     },
-    [setDecision]
+    [setDecision, triggerCursorBurst]
   );
 
   const handleActivateGear = useCallback((stage: number) => {
@@ -243,8 +290,9 @@ export function App() {
   const handleRepairFile = useCallback(
     (fileId: string) => {
       repairFile(fileId, showSecretToast);
+      triggerCursorBurst('unlock');
     },
-    [repairFile, showSecretToast]
+    [repairFile, showSecretToast, triggerCursorBurst]
   );
 
   const handleReplay = useCallback(
@@ -447,6 +495,14 @@ export function App() {
           handleSelectArtifactObj(art);
         }}
         onRepairFile={handleRepairFile}
+      />
+
+      {/* Archivist's Custom Cursor (Auto-disables on touch/reduced motion) */}
+      <CustomCursor
+        activeChapter={activeChapter}
+        reducedMotion={state.reducedMotion}
+        hovered3dKind={hoveredTarget?.kind ?? null}
+        burstSignal={cursorBurst}
       />
     </div>
   );

@@ -545,7 +545,7 @@ export const CHAPTERS: ChapterData[] = [
         consequenceSummary: 'Humanity entrusts governance, resource allocation, and long-term planning to autonomous intelligence.',
         whatIfNarrative: 'Conflict and scarcity are engineered away by hyper-rational systems—at the cost of human political agency.',
         whatIfVisualCue: 'The Archive Core crystallizes into towering geometric spires and a monumental central AI monolith.',
-        whatIfConsequence: 'Steers the timeline strongly toward The Machine Dominion.',
+        whatIfConsequence: 'Steers the timeline strongly toward The Machine Dependency.',
         accentTone: 'amber',
       },
       {

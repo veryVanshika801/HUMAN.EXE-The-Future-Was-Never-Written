@@ -111,6 +111,8 @@ export const MemoryMapRail: React.FC<MemoryMapRailProps> = ({
                     onClick={() => unlocked && onNavigateChapter(ch.id)}
                     disabled={!unlocked}
                     aria-label={`Chapter ${ch.number}: ${ch.title} (${ch.period})`}
+                    data-cursor-kind={unlocked ? 'nav' : undefined}
+                    data-cursor-label={unlocked ? `CH 0${ch.number}` : undefined}
                     className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center border transition-all cursor-pointer disabled:cursor-not-allowed ${
                       isCurrent
                         ? 'bg-[#A6C7A9] text-[#090B0D] border-[#A6C7A9] scale-110'
@@ -219,6 +221,47 @@ export const MemoryMapRail: React.FC<MemoryMapRailProps> = ({
                 <span className="w-2.5 h-2.5 rounded-full border border-dashed border-white/30" />
                 Undiscovered / Unvisited
               </span>
+            </div>
+
+            {/* Butterfly Effect Causal Lineage Chain */}
+            <div className="mt-4 p-3.5 rounded-xl bg-[#090B0D] border border-white/10 flex flex-wrap items-center gap-2 text-[11px] font-mono-archival">
+              <span className="text-[#899398] mr-1">BUTTERFLY LINEAGE:</span>
+              {CHAPTERS.map((ch, idx) => {
+                const chosenVal = decisions[ch.id];
+                const chosenOpt = ch.options.find((o) => o.value === chosenVal);
+                return (
+                  <React.Fragment key={ch.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onNavigateChapter(ch.id);
+                        onCloseModal();
+                      }}
+                      className={`px-2.5 py-1 rounded border transition-colors cursor-pointer ${
+                        chosenOpt
+                          ? 'bg-[#141E19] border-[#A6C7A9]/45 text-[#F0F2F2] hover:border-[#A6C7A9]'
+                          : 'bg-[#111619] border-white/10 text-[#899398] hover:border-white/30'
+                      }`}
+                    >
+                      0{ch.number}: {chosenOpt ? chosenOpt.label : 'Undecided'}
+                    </button>
+                    {idx < CHAPTERS.length - 1 && (
+                      <span className="text-[#899398]/60" aria-hidden="true">→</span>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+              <span className="text-[#899398]/60" aria-hidden="true">⇒</span>
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigateChapter('ending');
+                  onCloseModal();
+                }}
+                className="px-2.5 py-1 rounded border border-[#D9822B]/50 bg-[#1B140E] text-[#D9822B] hover:border-[#D9822B] cursor-pointer"
+              >
+                {endingOutcome.archetypeTitle}
+              </button>
             </div>
 
             {/* Interactive SVG Constellation Backbone connecting Eras 01-05 -> 2075 */}

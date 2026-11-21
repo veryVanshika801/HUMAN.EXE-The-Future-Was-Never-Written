@@ -258,7 +258,9 @@ export const ChapterSection: React.FC<ChapterSectionProps> = ({
               key={art.id}
               type="button"
               onClick={() => onSelectArtifact(art)}
-              className={`text-left p-3.5 rounded-lg border transition-colors cursor-pointer snap-start ${
+              data-cursor-kind="discovery"
+              data-cursor-label="AUTOPSY"
+              className={`museum-card-hover text-left p-3.5 rounded-lg border transition-colors cursor-pointer snap-start ${
                 chapterArtifacts.length > 3 ? 'min-w-[195px] shrink-0' : ''
               } ${
                 inspected
@@ -284,7 +286,11 @@ export const ChapterSection: React.FC<ChapterSectionProps> = ({
 
   const renderLostSignalCard = () =>
     chapterLost && (
-      <div className="gs-reveal bg-[#090B0D]/92 border border-[#D9822B]/35 rounded-xl p-5 flex flex-wrap items-center justify-between gap-3">
+      <div
+        data-cursor-kind="discovery"
+        data-cursor-label={isLostFound ? 'MEMORY' : 'SIGNAL'}
+        className="gs-reveal museum-card-hover bg-[#090B0D]/92 border border-[#D9822B]/35 rounded-xl p-5 flex flex-wrap items-center justify-between gap-3"
+      >
         <div className="min-w-0 flex-1">
           <div className="text-[11px] font-mono-archival text-[#D9822B] flex items-center gap-1.5">
             <Compass className="w-3.5 h-3.5" aria-hidden="true" />
@@ -298,6 +304,7 @@ export const ChapterSection: React.FC<ChapterSectionProps> = ({
           <button
             type="button"
             onClick={() => onRevisitLostArtifact(chapterLost)}
+            data-magnetic="true"
             className="px-3 py-1.5 text-xs border border-[#D9822B]/50 text-[#D9822B] hover:bg-[#D9822B]/15 rounded transition-colors cursor-pointer whitespace-nowrap"
           >
             Revisit Memory
@@ -766,6 +773,7 @@ export const ChapterSection: React.FC<ChapterSectionProps> = ({
                             onSetWhatIfPreview(null);
                             onSelectDecision(chapter.id, opt.value);
                           }}
+                          data-magnetic="true"
                           className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium rounded transition-colors cursor-pointer whitespace-nowrap ${
                             isSelected
                               ? 'bg-[#A6C7A9] text-[#090B0D]'
@@ -819,6 +827,9 @@ export const ChapterSection: React.FC<ChapterSectionProps> = ({
               <button
                 type="button"
                 onClick={() => onNavigateNext(nextChapterId)}
+                data-magnetic="true"
+                data-cursor-kind="nav"
+                data-cursor-label={chapter.number < 5 ? `CH 0${chapter.number + 1}` : '2075'}
                 className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-medium bg-[#BFC7CB] hover:bg-[#F0F2F2] text-[#090B0D] rounded transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
                 <span>{chapter.number < 5 ? `Enter Chapter 0${chapter.number + 1}` : 'Enter Archive Core'}</span>

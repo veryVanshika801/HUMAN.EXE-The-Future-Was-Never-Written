@@ -1,9 +1,11 @@
 import {
+  ArchiveProgressState,
   Choice1,
   Choice2,
   Choice3,
   Choice4,
   Choice5,
+  DecisionImpactDelta,
   DecisionsState,
   EndingArchetype,
   InfluenceScores,
@@ -17,76 +19,230 @@ const C4_OPTS: Choice4[] = ['total_connection', 'digital_privacy'];
 const C5_OPTS: Choice5[] = ['ai_leads', 'humans_lead', 'collaborate'];
 
 export function calculateInfluenceScores(decisions: DecisionsState): InfluenceScores {
-  let human = 34;
-  let machine = 33;
-  let symbiotic = 33;
+  let innovation = 42;
+  let connection = 42;
+  let humanAgency = 44;
+  const decisionFactors: DecisionImpactDelta[] = [];
 
   if (decisions.ch1 === 'share') {
-    human += 10;
-    symbiotic += 8;
-    machine -= 6;
+    innovation += 6;
+    connection += 18;
+    humanAgency += 8;
+    decisionFactors.push({
+      chapter: 1,
+      optionLabel: 'Share the Discovery',
+      innovationDelta: 6,
+      connectionDelta: 18,
+      agencyDelta: 8,
+    });
   } else if (decisions.ch1 === 'restrict') {
-    machine += 12;
-    human -= 6;
+    innovation += 3;
+    connection -= 14;
+    humanAgency -= 6;
+    decisionFactors.push({
+      chapter: 1,
+      optionLabel: 'Keep Knowledge Restricted',
+      innovationDelta: 3,
+      connectionDelta: -14,
+      agencyDelta: -6,
+    });
   }
 
-  if (decisions.ch2 === 'purpose') {
-    human += 14;
-    symbiotic += 6;
-    machine -= 8;
-  } else if (decisions.ch2 === 'productivity') {
-    machine += 15;
-    human -= 7;
+  if (decisions.ch2 === 'productivity') {
+    innovation += 16;
+    connection -= 4;
+    humanAgency -= 11;
+    decisionFactors.push({
+      chapter: 2,
+      optionLabel: 'Maximum Productivity',
+      innovationDelta: 16,
+      connectionDelta: -4,
+      agencyDelta: -11,
+    });
+  } else if (decisions.ch2 === 'purpose') {
+    innovation += 8;
+    connection += 10;
+    humanAgency += 16;
+    decisionFactors.push({
+      chapter: 2,
+      optionLabel: 'Human Purpose',
+      innovationDelta: 8,
+      connectionDelta: 10,
+      agencyDelta: 16,
+    });
   }
 
   if (decisions.ch3 === 'open') {
-    symbiotic += 14;
-    human += 6;
+    innovation += 12;
+    connection += 18;
+    humanAgency += 4;
+    decisionFactors.push({
+      chapter: 3,
+      optionLabel: 'Open Knowledge',
+      innovationDelta: 12,
+      connectionDelta: 18,
+      agencyDelta: 4,
+    });
   } else if (decisions.ch3 === 'privacy') {
-    human += 12;
-    machine -= 5;
+    innovation += 5;
+    connection -= 10;
+    humanAgency += 12;
+    decisionFactors.push({
+      chapter: 3,
+      optionLabel: 'Protect Information',
+      innovationDelta: 5,
+      connectionDelta: -10,
+      agencyDelta: 12,
+    });
   }
 
-  if (decisions.ch4 === 'digital_privacy') {
-    human += 12;
-    machine -= 6;
-  } else if (decisions.ch4 === 'total_connection') {
-    machine += 12;
-    symbiotic += 10;
-    human -= 6;
+  if (decisions.ch4 === 'total_connection') {
+    innovation += 15;
+    connection += 14;
+    humanAgency -= 10;
+    decisionFactors.push({
+      chapter: 4,
+      optionLabel: 'Total Connection',
+      innovationDelta: 15,
+      connectionDelta: 14,
+      agencyDelta: -10,
+    });
+  } else if (decisions.ch4 === 'digital_privacy') {
+    innovation += 6;
+    connection -= 8;
+    humanAgency += 14;
+    decisionFactors.push({
+      chapter: 4,
+      optionLabel: 'Digital Privacy',
+      innovationDelta: 6,
+      connectionDelta: -8,
+      agencyDelta: 14,
+    });
   }
 
-  if (decisions.ch5 === 'humans_lead') {
-    human += 28;
-    machine -= 14;
-  } else if (decisions.ch5 === 'ai_leads') {
-    machine += 30;
-    human -= 14;
+  if (decisions.ch5 === 'ai_leads') {
+    innovation += 20;
+    connection -= 10;
+    humanAgency -= 24;
+    decisionFactors.push({
+      chapter: 5,
+      optionLabel: 'AI Leads',
+      innovationDelta: 20,
+      connectionDelta: -10,
+      agencyDelta: -24,
+    });
+  } else if (decisions.ch5 === 'humans_lead') {
+    innovation -= 4;
+    connection += 8;
+    humanAgency += 26;
+    decisionFactors.push({
+      chapter: 5,
+      optionLabel: 'Humans Lead',
+      innovationDelta: -4,
+      connectionDelta: 8,
+      agencyDelta: 26,
+    });
   } else if (decisions.ch5 === 'collaborate') {
-    symbiotic += 32;
+    innovation += 14;
+    connection += 16;
+    humanAgency += 10;
+    decisionFactors.push({
+      chapter: 5,
+      optionLabel: 'Humans and AI Collaborate',
+      innovationDelta: 14,
+      connectionDelta: 16,
+      agencyDelta: 10,
+    });
   }
 
-  const clamp = (n: number) => Math.max(8, Math.min(96, Math.round(n)));
+  const clamp = (n: number) => Math.max(12, Math.min(96, Math.round(n)));
   return {
-    humanAgency: clamp(human),
-    machineAutomation: clamp(machine),
-    symbioticSynthesis: clamp(symbiotic),
+    innovation: clamp(innovation),
+    connection: clamp(connection),
+    humanAgency: clamp(humanAgency),
+    decisionFactors,
   };
 }
 
-function determineArchetype(scores: InfluenceScores, ch5: Choice5): EndingArchetype {
-  // Fifth choice carries decisive compact weight, tempered by cumulative historical momentum
-  if (ch5 === 'humans_lead') {
-    if (scores.machineAutomation > scores.humanAgency + 14) return 'symbiotic';
+/**
+ * Computes transparent Humanity Index combining decision trajectory + real archival exploration.
+ */
+export function calculateLiveHumanityIndex(
+  decisions: DecisionsState,
+  progress: ArchiveProgressState
+): {
+  innovation: number;
+  connection: number;
+  humanAgency: number;
+  explorationBonuses: {
+    innovation: number;
+    connection: number;
+    humanAgency: number;
+  };
+  decisionFactors: DecisionImpactDelta[];
+  overallScore: number;
+} {
+  const normalized = normalizeDecisions(decisions);
+  const base = calculateInfluenceScores(normalized);
+
+  const innovationBonus = Math.min(6, Math.floor(progress.inspectedArtifacts.length / 3));
+  const connectionBonus = Math.min(
+    6,
+    progress.discoveredLostArtifacts.length + Math.floor(progress.unlockedSecrets.length / 2)
+  );
+  const agencyBonus = Math.min(6, progress.repairedFiles.length);
+
+  const clamp = (n: number) => Math.max(12, Math.min(99, Math.round(n)));
+  const innovation = clamp(base.innovation + innovationBonus);
+  const connection = clamp(base.connection + connectionBonus);
+  const humanAgency = clamp(base.humanAgency + agencyBonus);
+
+  return {
+    innovation,
+    connection,
+    humanAgency,
+    explorationBonuses: {
+      innovation: innovationBonus,
+      connection: connectionBonus,
+      humanAgency: agencyBonus,
+    },
+    decisionFactors: base.decisionFactors,
+    overallScore: Math.round((innovation + connection + humanAgency) / 3),
+  };
+}
+
+function determineArchetype(scores: InfluenceScores, d: Required<DecisionsState>): EndingArchetype {
+  // 1. The Lost Connection: high hyper-tech / restricted & isolated humanity with eroded empathy
+  if (
+    (d.ch5 === 'ai_leads' && scores.connection < 44) ||
+    (d.ch1 === 'restrict' && d.ch3 === 'privacy' && d.ch4 === 'digital_privacy' && scores.connection <= 36)
+  ) {
+    return 'lost_connection';
+  }
+
+  // 2. The Machine Dependency: automation leads while productivity / total_connection ceded human sovereignty
+  if (
+    d.ch5 === 'ai_leads' &&
+    (d.ch2 === 'productivity' || d.ch4 === 'total_connection' || scores.humanAgency <= 34)
+  ) {
+    return 'machine_dependency';
+  }
+
+  // 3. The Divided Network: asymmetric gatekeeping & fragmented civic access
+  if (
+    (d.ch1 === 'restrict' && d.ch3 !== (d.ch4 === 'total_connection' ? 'open' : 'privacy')) ||
+    (d.ch1 === 'restrict' && d.ch2 === 'productivity' && d.ch5 !== 'collaborate') ||
+    (d.ch3 === 'open' && d.ch4 === 'digital_privacy' && d.ch2 === 'productivity' && d.ch5 === 'ai_leads')
+  ) {
+    return 'divided_network';
+  }
+
+  // 4. The Human Renaissance: strong mortal sovereignty & stewardship
+  if (d.ch5 === 'humans_lead' || (scores.humanAgency >= 70 && d.ch2 === 'purpose' && d.ch5 !== 'ai_leads')) {
     return 'renaissance';
   }
-  if (ch5 === 'ai_leads') {
-    if (scores.humanAgency > scores.machineAutomation + 14) return 'symbiotic';
-    return 'dominion';
-  }
-  // ch5 === 'collaborate'
-  if (scores.machineAutomation >= scores.symbioticSynthesis + 16) return 'dominion';
-  if (scores.humanAgency >= scores.symbioticSynthesis + 16) return 'renaissance';
+
+  // 5. The Symbiotic Future: co-authored compact balancing innovation, connection & agency
   return 'symbiotic';
 }
 
@@ -95,45 +251,32 @@ const ARCHETYPE_META: Record<
   { title: string; quote: string; baseColor: string }
 > = {
   renaissance: {
-    title: 'The Human Renaissance',
-    quote: 'The greatest invention was never the machine. It was the human imagination that created it.',
+    title: 'THE HUMAN RENAISSANCE',
+    quote: 'The greatest invention was never the machine. It was the human imagination that kept its hand on the helm.',
     baseColor: '#A6C7A9',
   },
-  dominion: {
-    title: 'The Machine Dominion',
-    quote: 'Humanity created intelligence to serve itself. It forgot to decide where service should end.',
+  machine_dependency: {
+    title: 'THE MACHINE DEPENDENCY',
+    quote: 'Humanity built intelligence to carry every burden—and woke in 2075 uncertain how to walk without its scaffolding.',
     baseColor: '#C95D3A',
   },
+  divided_network: {
+    title: 'THE DIVIDED NETWORK',
+    quote: 'Progress arrived everywhere, yet permission remained partitioned behind inherited walls.',
+    baseColor: '#D9822B',
+  },
   symbiotic: {
-    title: 'The Symbiotic Future',
-    quote: 'The future was never about choosing between humans and machines. It was about learning how to build together.',
+    title: 'THE SYMBIOTIC FUTURE',
+    quote: 'The future was never about choosing between humans and machines. It was about learning how to co-author meaning.',
     baseColor: '#BFC7CB',
+  },
+  lost_connection: {
+    title: 'THE LOST CONNECTION',
+    quote: 'Every satellite overhead shines with flawless bandwidth, yet across silent cities almost nobody reaches across the dark.',
+    baseColor: '#899398',
   },
 };
 
-// Deterministic 48-path title matrix indexed by (c1*24 + c2*12 + c3*6 + c4*3 + c5)
-const PATH_TITLES: string[] = [
-  // share + productivity + open
-  'The Open Furnace Singularity',
-  'The Makers’ Republic of Craft',
-  'The Civic Engine Accord',
-  // share + productivity + privacy
-  'The Vaulted Guild Lattice',
-  'Sovereign Artisans of Steel',
-  'The Shielded Commons Pact',
-  // share + purpose + open
-  'The Planetary Hearth Archive',
-  'Living Gardens of Alexandria',
-  'The Luminous Co-Authorship',
-  // share + purpose + privacy
-  'The Quiet Sanctuary Mesh',
-  'Sanctuary of Mortal Hands',
-  'The Consented Horizon',
-  // share + productivity + privacy + digital_privacy... wait let's ensure 48 exact entries:
-  // Let's map cleanly: 16 combinations of (c1,c2,c3,c4) * 3 of c5 = 48
-];
-
-// Clean 16-prefix x 3-suffix title builder guarantees 48 distinct evocative titles
 const PREFIX_16 = [
   'Open-Hearth Optimization',      // share, prod, open, total
   'Guarded-Stream Commons',        // share, prod, open, priv
@@ -193,13 +336,12 @@ export function resolvePathOutcome(rawDecisions: DecisionsState): PathOutcome {
   const signature = `${codeBits.join(' / ')}`;
 
   const scores = calculateInfluenceScores(d);
-  const archetype = determineArchetype(scores, d.ch5);
+  const archetype = determineArchetype(scores, d);
   const meta = ARCHETYPE_META[archetype];
 
   const prefixIdx = i1 * 8 + i2 * 4 + i3 * 2 + i4;
   const pathTitle = `${PREFIX_16[prefixIdx]} ${SUFFIX_3[d.ch5]}`;
 
-  // Era-specific prose fragments that weave together into 48 distinct narratives
   const f1 =
     d.ch1 === 'share'
       ? 'You began by placing fire into every hand, anchoring civilization in shared trust.'
@@ -229,7 +371,6 @@ export function resolvePathOutcome(rawDecisions: DecisionsState): PathOutcome {
 
   const historicalSummary = `${f1} ${f2} ${f3} ${f4} ${f5}`;
 
-  // Distinct future descriptions by archetype + modifier nuances
   const privacyTone =
     d.ch4 === 'digital_privacy' || d.ch3 === 'privacy'
       ? 'Cities preserve quiet architectural sanctuaries shielded from ambient telemetry.'
@@ -243,21 +384,23 @@ export function resolvePathOutcome(rawDecisions: DecisionsState): PathOutcome {
   const originTone =
     d.ch1 === 'share'
       ? 'Every milestone remains accessible as common heritage.'
-      : 'Access to core engines remains tiered behind formal stewardship charters.';
+      : 'Access to foundational systems remains tiered behind formal stewardship charters.';
 
-  const futureDescription =
-    archetype === 'renaissance'
-      ? `By 2075, glass and living timber rise over restored watersheds. ${industryTone} ${privacyTone} ${originTone}`
-      : archetype === 'dominion'
-      ? `By 2075, vast obsidian-silver spires regulate climate, transit, and allocation with silent mathematical grace. ${industryTone} ${privacyTone} ${originTone}`
-      : `By 2075, botanical terraces weave directly around suspended computational rings. ${industryTone} ${privacyTone} ${originTone}`;
+  const futureDescriptionByArchetype: Record<EndingArchetype, string> = {
+    renaissance: `By 2075, glass and living timber rise over restored watersheds. ${industryTone} ${privacyTone} ${originTone}`,
+    machine_dependency: `By 2075, vast obsidian-silver spires regulate climate, transit, and allocation while human skills slowly atrophy behind effortless automation. ${industryTone} ${privacyTone} ${originTone}`,
+    divided_network: `By 2075, brilliance and scarcity live side by side across a partitioned grid: radiant inner sanctuaries flourish behind gilded protocols while outer corridors relay fragmented bandwidth. ${industryTone} ${originTone}`,
+    symbiotic: `By 2075, botanical terraces weave directly around suspended computational rings in transparent human-machine partnership. ${industryTone} ${privacyTone} ${originTone}`,
+    lost_connection: `By 2075, orbital beacons shine down upon quiet, isolated dwellings where hyper-secured walls outnumber shared tables. Intelligence runs cleanly—yet collective warmth has grown rare. ${industryTone} ${originTone}`,
+  };
 
-  const finalArchiveMessage =
-    archetype === 'renaissance'
-      ? `Archive Record #${String(pathIndex).padStart(2, '0')}/48: You proved that restraint and imagination can outlast sheer velocity. Machines remain instruments; humanity remains the author.`
-      : archetype === 'dominion'
-      ? `Archive Record #${String(pathIndex).padStart(2, '0')}/48: Efficiency conquered scarcity, yet the quiet unpredictability of mortal agency now survives mostly inside this museum.`
-      : `Archive Record #${String(pathIndex).padStart(2, '0')}/48: Neither surrendered to the other. Through ${d.ch1 === 'share' ? 'shared embers' : 'disciplined stewardship'} and ${d.ch4 === 'digital_privacy' ? 'protected interiority' : 'total synthesis'}, you wrote a balanced compact.`;
+  const finalMessageByArchetype: Record<EndingArchetype, string> = {
+    renaissance: `Archive Record #${String(pathIndex).padStart(2, '0')}/48: You proved restraint and imagination can outlast sheer velocity. Machines remain instruments; humanity remains the author.`,
+    machine_dependency: `Archive Record #${String(pathIndex).padStart(2, '0')}/48: Scarcity vanished under autonomous care, yet mortal self-determination now survives largely as an exhibit inside this museum.`,
+    divided_network: `Archive Record #${String(pathIndex).padStart(2, '0')}/48: Gatekeeping built dazzling citadels alongside deep inequities. What history builds must still learn whom it is built for.`,
+    symbiotic: `Archive Record #${String(pathIndex).padStart(2, '0')}/48: Neither surrendered to the other. Through shared curiosity and deliberate governance, you wrote an enduring compact.`,
+    lost_connection: `Archive Record #${String(pathIndex).padStart(2, '0')}/48: Even brilliant systems cannot replace presence. Inside isolated fortresses of code, the Archive reminds you of the first hearth circle.`,
+  };
 
   const unlockedMemories: string[] = [
     d.ch1 === 'share' ? 'MEM-A1 · The Communal Hearth Treaty' : 'MEM-B1 · Seal of the Fire Keepers',
@@ -271,13 +414,16 @@ export function resolvePathOutcome(rawDecisions: DecisionsState): PathOutcome {
       : 'MEM-S5 · The Dual-Author Compact',
   ];
 
-  // Visual parameters driving subtle differences across all 48 paths in the 3D EndingScene
   const organicRatio =
     archetype === 'renaissance'
-      ? d.ch2 === 'purpose' ? 0.92 : 0.72
+      ? d.ch2 === 'purpose' ? 0.92 : 0.74
       : archetype === 'symbiotic'
-      ? d.ch4 === 'digital_privacy' ? 0.65 : 0.52
-      : d.ch1 === 'share' ? 0.22 : 0.08;
+      ? d.ch4 === 'digital_privacy' ? 0.68 : 0.54
+      : archetype === 'divided_network'
+      ? 0.34
+      : archetype === 'lost_connection'
+      ? 0.22
+      : d.ch1 === 'share' ? 0.24 : 0.1;
 
   const structureDensity =
     d.ch2 === 'productivity' ? (d.ch4 === 'total_connection' ? 0.96 : 0.82) : (d.ch4 === 'total_connection' ? 0.68 : 0.48);
@@ -285,12 +431,21 @@ export function resolvePathOutcome(rawDecisions: DecisionsState): PathOutcome {
   const ringSpeed =
     d.ch5 === 'ai_leads' ? 1.35 : d.ch5 === 'collaborate' ? 0.85 : 0.45;
 
-  const accentHex =
-    archetype === 'renaissance'
-      ? '#A6C7A9'
-      : archetype === 'dominion'
-      ? (d.ch1 === 'restrict' ? '#C95D3A' : '#D9822B')
-      : (d.ch4 === 'digital_privacy' ? '#A6C7A9' : '#BFC7CB');
+  const skyHueByArchetype: Record<EndingArchetype, string> = {
+    renaissance: '#0B120E',
+    machine_dependency: '#17100E',
+    divided_network: '#14110D',
+    symbiotic: '#0B1014',
+    lost_connection: '#090B0E',
+  };
+
+  const accentByArchetype: Record<EndingArchetype, string> = {
+    renaissance: '#A6C7A9',
+    machine_dependency: '#C95D3A',
+    divided_network: '#D9822B',
+    symbiotic: '#BFC7CB',
+    lost_connection: '#899398',
+  };
 
   const atmosphereNote = `Structure Density ${Math.round(structureDensity * 100)}% · Organic Integration ${Math.round(organicRatio * 100)}% · Orbital Cadence ${ringSpeed.toFixed(2)}x`;
 
@@ -302,17 +457,17 @@ export function resolvePathOutcome(rawDecisions: DecisionsState): PathOutcome {
     archetypeTitle: meta.title,
     archetypeQuote: meta.quote,
     pathTitle,
-    futureDescription,
-    finalArchiveMessage,
+    futureDescription: futureDescriptionByArchetype[archetype],
+    finalArchiveMessage: finalMessageByArchetype[archetype],
     historicalSummary,
     unlockedMemories,
     visualVariation: {
       label: `Simulation Variant ${String(pathIndex).padStart(2, '0')}`,
-      skyHue: archetype === 'dominion' ? '#18110E' : archetype === 'renaissance' ? '#0B120E' : '#0B1014',
+      skyHue: skyHueByArchetype[archetype],
       structureDensity,
       organicRatio,
       ringSpeed,
-      accentHex,
+      accentHex: accentByArchetype[archetype],
       atmosphereNote,
     },
     scores,
@@ -361,5 +516,3 @@ export function getAll48PathsSummary(): Array<{
   }
   return results;
 }
-
-export { PATH_TITLES };

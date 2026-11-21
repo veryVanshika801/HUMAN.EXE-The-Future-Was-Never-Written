@@ -17,6 +17,52 @@ import { audioEngine, DEFAULT_AUDIO_SETTINGS } from '../logic/audioEngine';
 
 const STORAGE_KEY = 'human_exe_archive_v2';
 
+export interface JournalClueDef {
+  id: string;
+  chapter: ChapterNumber | 0;
+  code: string;
+  title: string;
+  note: string;
+}
+
+export const JOURNAL_CLUES: JournalClueDef[] = [
+  {
+    id: 'clue-hearth-covenant',
+    chapter: 1,
+    code: 'CLUE 01',
+    title: 'Shared Fire & Early Pedagogy',
+    note: 'Cavern flint flakes and shared embers suggest communal instruction predated metallurgy by millennia.',
+  },
+  {
+    id: 'clue-industrial-cadence',
+    chapter: 2,
+    code: 'CLUE 02',
+    title: 'The Mechanized Hour',
+    note: 'Clockwork escapements bridged maritime astronomy and factory whistles—turning lived time into scheduled shifts.',
+  },
+  {
+    id: 'clue-lovelace-bridge',
+    chapter: 3,
+    code: 'CLUE 03',
+    title: 'Jacquard Loom to Symbolic Silicon',
+    note: 'Compare the Chapter 2 Clockwork Machine with the Chapter 3 Terminal CODE module to verify Ada Lovelace’s leap.',
+  },
+  {
+    id: 'clue-subsea-cables',
+    chapter: 4,
+    code: 'CLUE 04',
+    title: 'Physical Foundations of the Cloud',
+    note: 'Transoceanic glass fibers on the seafloor carry 98% of international packets beneath the orbital mesh.',
+  },
+  {
+    id: 'clue-2075-quorum',
+    chapter: 5,
+    code: 'CLUE 05',
+    title: 'The Final Seal of 2074',
+    note: 'Recovery of Lost Memory 005 alongside UNKNOWN_ARCHIVE_2075.LOG unlocks the Silent Quorum pact.',
+  },
+];
+
 const getInitialReducedMotion = () => {
   if (typeof window === 'undefined') return false;
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -30,6 +76,7 @@ const DEFAULT_STATE: ArchiveProgressState = {
   discoveredLostArtifacts: [],
   repairedFiles: [],
   unlockedSecrets: [],
+  unlockedClues: [],
   eventLog: [],
   audio: { ...DEFAULT_AUDIO_SETTINGS },
   soundEnabled: false,
@@ -65,7 +112,7 @@ function loadState(): ArchiveProgressState {
     const mergedAudio: AudioSettings = {
       ...DEFAULT_AUDIO_SETTINGS,
       ...(parsed.audio && typeof parsed.audio === 'object' ? parsed.audio : {}),
-      enabled: false, // browser autoplay requires explicit user interaction per session
+      enabled: false,
     };
     return {
       ...DEFAULT_STATE,
@@ -75,6 +122,7 @@ function loadState(): ArchiveProgressState {
       discoveredLostArtifacts: Array.isArray(parsed.discoveredLostArtifacts) ? parsed.discoveredLostArtifacts : [],
       repairedFiles: Array.isArray(parsed.repairedFiles) ? parsed.repairedFiles : [],
       unlockedSecrets: Array.isArray(parsed.unlockedSecrets) ? parsed.unlockedSecrets : [],
+      unlockedClues: Array.isArray(parsed.unlockedClues) ? parsed.unlockedClues : [],
       eventLog: Array.isArray(parsed.eventLog) ? parsed.eventLog : [],
       decisions: parsed.decisions && typeof parsed.decisions === 'object' ? parsed.decisions : {},
       audio: mergedAudio,
@@ -83,6 +131,11 @@ function loadState(): ArchiveProgressState {
   } catch {
     return { ...DEFAULT_STATE, reducedMotion: getInitialReducedMotion() };
   }
+}
+
+function addClueUnique(existing: string[] | undefined, clueId: string): string[] {
+  const list = existing ?? [];
+  return list.includes(clueId) ? list : [...list, clueId];
 }
 
 export function useArchiveState() {
@@ -111,23 +164,30 @@ export function useArchiveState() {
       ...prev,
       introCompleted: true,
       visitedChapters: prev.visitedChapters.includes(1) ? prev.visitedChapters : [...prev.visitedChapters, 1],
+      unlockedClues: addClueUnique(prev.unlockedClues, 'clue-hearth-covenant'),
       eventLog: [
         makeEvent('intro', 'chapter', 'Archive Access Granted', 'Entered Chapter 01 — The First Spark.'),
         ...prev.eventLog,
-      ].slice(0, 60),
+      ].slice(0, 80),
     }));
   }, []);
 
   const markChapterVisited = useCallback((chapter: ChapterNumber) => {
     setState((prev) => {
       if (prev.visitedChapters.includes(chapter)) return prev;
+      audioEngine.playEraSound('chapterUnlock');
+      let nextClues = prev.unlockedClues ?? [];
+      if (chapter === 1) nextClues = addClueUnique(nextClues, 'clue-hearth-covenant');
+      if (chapter === 2) nextClues = addClueUnique(nextClues, 'clue-industrial-cadence');
+      if (chapter === 4) nextClues = addClueUnique(nextClues, 'clue-subsea-cables');
       return {
         ...prev,
         visitedChapters: [...prev.visitedChapters, chapter],
+        unlockedClues: nextClues,
         eventLog: [
           makeEvent(`ch${chapter}` as ChapterId, 'chapter', `Entered Chapter 0${chapter}`, 'Historical layer indexed.'),
           ...prev.eventLog,
-        ].slice(0, 60),
+        ].slice(0, 80),
       };
     });
   }, []);
@@ -140,7 +200,7 @@ export function useArchiveState() {
       eventLog: [
         makeEvent(key as ChapterId, 'decision', `Timeline Choice (${key.toUpperCase()})`, `Recorded choice: ${String(value)}.`),
         ...prev.eventLog,
-      ].slice(0, 60),
+      ].slice(0, 80),
     }));
   }, []);
 
@@ -150,9 +210,12 @@ export function useArchiveState() {
       const secret = SECRET_MEMORIES.find((s) => s.id === secretId);
       audioEngine.playEraSound('secret');
       onNewlyUnlocked?.(secretId);
+      let nextClues = prev.unlockedClues ?? [];
+      if (secretId === 'secret-004') nextClues = addClueUnique(nextClues, 'clue-subsea-cables');
       return {
         ...prev,
         unlockedSecrets: [...prev.unlockedSecrets, secretId],
+        unlockedClues: nextClues,
         eventLog: [
           makeEvent(
             `ch${secret?.chapter ?? 1}` as ChapterId,
@@ -161,7 +224,7 @@ export function useArchiveState() {
             secret?.historicalInsight ?? 'Rare archival layer uncovered.'
           ),
           ...prev.eventLog,
-        ].slice(0, 60),
+        ].slice(0, 80),
       };
     });
   }, []);
@@ -188,6 +251,10 @@ export function useArchiveState() {
           ) && !prev.unlockedSecrets.includes('secret-005');
 
         let nextSecrets = [...prev.unlockedSecrets];
+        let nextClues = prev.unlockedClues ?? [];
+        if (artifactId === 'art-clockwork-machine') {
+          nextClues = addClueUnique(nextClues, 'clue-lovelace-bridge');
+        }
         const events = [...prev.eventLog];
 
         if (!prev.inspectedArtifacts.includes(artifactId) && artifact) {
@@ -218,7 +285,8 @@ export function useArchiveState() {
           ...prev,
           inspectedArtifacts: nextInspected,
           unlockedSecrets: nextSecrets,
-          eventLog: events.slice(0, 60),
+          unlockedClues: nextClues,
+          eventLog: events.slice(0, 80),
         };
       });
 
@@ -236,6 +304,7 @@ export function useArchiveState() {
     let unlockedLovelace = false;
 
     setState((prev) => {
+      const nextClues = addClueUnique(prev.unlockedClues, 'clue-lovelace-bridge');
       if (
         prev.inspectedArtifacts.includes('art-clockwork-machine') &&
         !prev.unlockedSecrets.includes('secret-002')
@@ -245,13 +314,14 @@ export function useArchiveState() {
         return {
           ...prev,
           unlockedSecrets: [...prev.unlockedSecrets, 'secret-002'],
+          unlockedClues: nextClues,
           eventLog: [
             makeEvent('ch3', 'secret', `Secret Discovered · ${sec?.title}`, sec?.historicalInsight ?? ''),
             ...prev.eventLog,
-          ].slice(0, 60),
+          ].slice(0, 80),
         };
       }
-      return prev;
+      return { ...prev, unlockedClues: nextClues };
     });
 
     if (unlockedLovelace) {
@@ -265,9 +335,12 @@ export function useArchiveState() {
     const lost = LOST_ARTIFACTS.find((l) => l.id === lostId);
     setState((prev) => {
       if (prev.discoveredLostArtifacts.includes(lostId)) return prev;
+      let nextClues = prev.unlockedClues ?? [];
+      if (lostId === 'lost-005') nextClues = addClueUnique(nextClues, 'clue-2075-quorum');
       return {
         ...prev,
         discoveredLostArtifacts: [...prev.discoveredLostArtifacts, lostId],
+        unlockedClues: nextClues,
         eventLog: [
           makeEvent(
             `ch${lost?.chapter ?? 1}` as ChapterId,
@@ -276,7 +349,7 @@ export function useArchiveState() {
             lost?.title ?? ''
           ),
           ...prev.eventLog,
-        ].slice(0, 60),
+        ].slice(0, 80),
       };
     });
   }, []);
@@ -292,17 +365,19 @@ export function useArchiveState() {
         : [...prev.repairedFiles, fileId];
 
       let nextSecrets = prev.unlockedSecrets;
+      let nextClues = prev.unlockedClues ?? [];
       const events = [...prev.eventLog];
 
       if (!prev.repairedFiles.includes(fileId) && file) {
         events.unshift(
-          makeEvent(`ch${file.chapter}` as ChapterId, 'file', `Repaired ${file.filename}`, file.hiddenMemoryTitle)
+          makeEvent(`ch${file.chapter}` as ChapterId, 'file', `Restored ${file.filename}`, file.hiddenMemoryTitle)
         );
       }
 
       if (fileId === 'file-unknown-2075' && !prev.unlockedSecrets.includes('secret-003')) {
         unlockedQuorum = true;
         nextSecrets = [...nextSecrets, 'secret-003'];
+        nextClues = addClueUnique(nextClues, 'clue-2075-quorum');
         const sec = SECRET_MEMORIES.find((s) => s.id === 'secret-003');
         events.unshift(
           makeEvent('ch5', 'secret', `Secret Discovered · ${sec?.title}`, sec?.historicalInsight ?? '')
@@ -313,7 +388,8 @@ export function useArchiveState() {
         ...prev,
         repairedFiles: nextRepaired,
         unlockedSecrets: nextSecrets,
-        eventLog: events.slice(0, 60),
+        unlockedClues: nextClues,
+        eventLog: events.slice(0, 80),
       };
     });
 
@@ -361,10 +437,11 @@ export function useArchiveState() {
       repairedFiles: keepCollection ? prev.repairedFiles : [],
       inspectedArtifacts: keepCollection ? prev.inspectedArtifacts : [],
       unlockedSecrets: keepCollection ? prev.unlockedSecrets : [],
+      unlockedClues: keepCollection ? (prev.unlockedClues ?? []) : ['clue-hearth-covenant'],
       eventLog: [
-        makeEvent('intro', 'chapter', 'Timeline Reset', keepCollection ? 'Kept recovered collection.' : 'Full archive reset.'),
+        makeEvent('intro', 'chapter', 'Timeline Reset', keepCollection ? 'Kept recovered journal archive.' : 'Full archive reset.'),
         ...(keepCollection ? prev.eventLog : []),
-      ].slice(0, 60),
+      ].slice(0, 80),
     }));
   }, []);
 

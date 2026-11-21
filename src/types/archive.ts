@@ -16,7 +16,12 @@ export interface DecisionsState {
   ch5?: Choice5;
 }
 
-export type EndingArchetype = 'renaissance' | 'dominion' | 'symbiotic';
+export type EndingArchetype =
+  | 'renaissance'
+  | 'machine_dependency'
+  | 'divided_network'
+  | 'symbiotic'
+  | 'lost_connection';
 
 export interface AudioSettings {
   enabled: boolean;
@@ -33,9 +38,17 @@ export interface ArchiveEvent {
   id: string;
   timestamp: string;
   chapter: ChapterId;
-  category: 'chapter' | 'artifact' | 'lost' | 'file' | 'decision' | 'secret';
+  category: 'chapter' | 'artifact' | 'lost' | 'file' | 'decision' | 'secret' | 'clue';
   title: string;
   detail: string;
+}
+
+export interface ArtifactHotspot {
+  id: string;
+  label: string;
+  part: string;
+  detail: string;
+  position: [number, number, number];
 }
 
 export interface ArtifactItem {
@@ -45,11 +58,15 @@ export interface ArtifactItem {
   accessionCode: string;
   era: string;
   perspectiveTag?: string;
+  layoutMode: 'relic' | 'blueprint' | 'neural';
+  materialProfile: string;
+  dimensionsLabel: string;
   soundType: 'stone' | 'gear' | 'steam' | 'keyclick' | 'networkPulse' | 'neuralPulse';
   summary: string;
   historicalContext: string;
   whyItMattered: string;
   impactOnHumanity: string;
+  hotspots: ArtifactHotspot[];
 }
 
 export interface LostArtifactItem {
@@ -75,12 +92,20 @@ export interface SecretMemoryItem {
   historicalInsight: string;
 }
 
+export interface ReconstructionFragment {
+  id: string;
+  slotLabel: string;
+  code: string;
+  snippet: string;
+}
+
 export interface CorruptedFileItem {
   id: string;
   filename: string;
   chapter: ChapterNumber;
   sizeLabel: string;
   fileType: string;
+  visualType: 'photo_matrix' | 'document_fragment' | 'signal_trace';
   requiredLostArtifactId?: string;
   corruptedPreview: string;
   hiddenMemoryTitle: string;
@@ -88,6 +113,7 @@ export interface CorruptedFileItem {
   technologicalFact: string;
   narrativeFragment: string;
   forwardConnection: string;
+  fragments: ReconstructionFragment[];
 }
 
 export interface ChapterStage {
@@ -151,10 +177,19 @@ export interface GearStageData {
   chainEffect: string;
 }
 
+export interface DecisionImpactDelta {
+  chapter: ChapterNumber;
+  optionLabel: string;
+  innovationDelta: number;
+  connectionDelta: number;
+  agencyDelta: number;
+}
+
 export interface InfluenceScores {
+  innovation: number;
+  connection: number;
   humanAgency: number;
-  machineAutomation: number;
-  symbioticSynthesis: number;
+  decisionFactors: DecisionImpactDelta[];
 }
 
 export interface PathOutcome {
@@ -189,6 +224,7 @@ export interface ArchiveProgressState {
   discoveredLostArtifacts: string[];
   repairedFiles: string[];
   unlockedSecrets: string[];
+  unlockedClues?: string[];
   eventLog: ArchiveEvent[];
   audio: AudioSettings;
   soundEnabled: boolean;

@@ -160,6 +160,9 @@ export const OpeningSequence: React.FC<OpeningSequenceProps> = ({
               <button
                 type="button"
                 onClick={onEnterArchive}
+                data-magnetic="true"
+                data-cursor-kind="nav"
+                data-cursor-label="ENTER"
                 className={`inline-flex items-center gap-3 px-6 py-3 font-medium text-sm rounded transition-colors cursor-pointer whitespace-nowrap ${
                   activeScene.index >= 6
                     ? 'bg-[#A6C7A9] hover:bg-[#F0F2F2] text-[#090B0D]'

@@ -44,6 +44,8 @@ export const TopNav: React.FC<TopNavProps> = ({
         <button
           type="button"
           onClick={onOpenMemoryMap}
+          data-cursor-kind="nav"
+          data-cursor-label="MAP"
           className="inline-flex items-center gap-1.5 hover:text-[#F0F2F2] transition-colors whitespace-nowrap shrink-0 cursor-pointer py-1.5"
         >
           <Map className="w-3.5 h-3.5 text-[#A6C7A9]" aria-hidden="true" />
@@ -53,10 +55,13 @@ export const TopNav: React.FC<TopNavProps> = ({
         <button
           type="button"
           onClick={onOpenArchiveLog}
+          aria-label="Open Archivist's Journal"
+          data-cursor-kind="nav"
+          data-cursor-label="JOURNAL"
           className="inline-flex items-center gap-1.5 hover:text-[#F0F2F2] transition-colors whitespace-nowrap shrink-0 cursor-pointer py-1.5"
         >
           <Archive className="w-3.5 h-3.5 text-[#BFC7CB]" aria-hidden="true" />
-          <span>Archive Log</span>
+          <span>Journal</span>
         </button>
 
         <div className="inline-flex items-center gap-1 shrink-0">
@@ -103,6 +108,9 @@ export const TopNav: React.FC<TopNavProps> = ({
         <button
           type="button"
           onClick={onJumpToEnding}
+          data-magnetic="true"
+          data-cursor-kind="nav"
+          data-cursor-label="CORE"
           className="inline-flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium text-[#090B0D] bg-[#BFC7CB] hover:bg-[#F0F2F2] rounded transition-colors whitespace-nowrap shrink-0 cursor-pointer"
         >
           <Sparkles className="w-3.5 h-3.5 hidden sm:inline" aria-hidden="true" />
