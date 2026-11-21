@@ -113,6 +113,8 @@ export const MemoryMapRail: React.FC<MemoryMapRailProps> = ({
                   <button
                     type="button"
                     onClick={() => unlocked && onNavigateChapter(ch.id)}
+                    onFocus={() => setHoveredNode(ch.number)}
+                    onBlur={() => setHoveredNode(null)}
                     disabled={!unlocked}
                     aria-label={`Chapter ${ch.number}: ${ch.title} (${ch.period})`}
                     data-cursor-kind={unlocked ? 'nav' : undefined}
@@ -148,6 +150,8 @@ export const MemoryMapRail: React.FC<MemoryMapRailProps> = ({
               <button
                 type="button"
                 onClick={() => onNavigateChapter('ending')}
+                onFocus={() => setHoveredNode(6)}
+                onBlur={() => setHoveredNode(null)}
                 aria-label="Archive Core 2075"
                 className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center border transition-all cursor-pointer ${
                   activeChapter === 'ending' || activeChapter === 'credits'
@@ -302,12 +306,24 @@ export const MemoryMapRail: React.FC<MemoryMapRailProps> = ({
                   return (
                     <g
                       key={ch.id}
+                      role="button"
+                      tabIndex={unlocked ? 0 : -1}
+                      aria-disabled={!unlocked}
+                      aria-label={`Jump to Chapter ${ch.number}: ${ch.title} (${ch.period})${unlocked ? '' : ', locked'}`}
                       onClick={() => {
                         if (!unlocked) return;
                         onNavigateChapter(ch.id);
                         onCloseModal();
                       }}
-                      className={unlocked ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}
+                      onKeyDown={(e) => {
+                        if (!unlocked) return;
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onNavigateChapter(ch.id);
+                          onCloseModal();
+                        }
+                      }}
+                      className={unlocked ? 'cursor-pointer focus:outline-none' : 'cursor-not-allowed opacity-50 focus:outline-none'}
                     >
                       {/* Satellite link to Lost Memory */}
                       <line x1={cx} y1={cy} x2={cx - 26} y2={20} stroke="rgba(217,130,43,0.35)" strokeWidth="1" />
@@ -365,11 +381,21 @@ export const MemoryMapRail: React.FC<MemoryMapRailProps> = ({
 
                 {/* 2075 Core Final Star */}
                 <g
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Jump to Archive Core 2075"
                   onClick={() => {
                     onNavigateChapter('ending');
                     onCloseModal();
                   }}
-                  className="cursor-pointer"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onNavigateChapter('ending');
+                      onCloseModal();
+                    }
+                  }}
+                  className="cursor-pointer focus:outline-none"
                 >
                   <circle
                     cx={845}
@@ -502,25 +528,28 @@ export const MemoryMapRail: React.FC<MemoryMapRailProps> = ({
                 );
               })}
 
-              <button
-                type="button"
-                onClick={() => {
-                  onNavigateChapter('ending');
-                  onCloseModal();
-                }}
-                className="text-left p-4 rounded-lg border border-[#A6C7A9]/40 bg-[#131A1D] hover:border-[#A6C7A9] transition-all flex flex-col justify-between gap-3 cursor-pointer"
-              >
+              <div className="p-4 rounded-lg border border-[#A6C7A9]/40 bg-[#131A1D] hover:border-[#A6C7A9] transition-all flex flex-col justify-between gap-3">
                 <div>
-                  <div className="flex items-center justify-between text-xs font-mono-archival text-[#A6C7A9]">
-                    <span>2075</span>
-                    <Compass className="w-3.5 h-3.5" />
-                  </div>
-                  <h3 className="text-sm font-semibold text-[#F0F2F2] mt-3">Archive Core</h3>
-                  <p className="text-xs text-[#899398] mt-1">{endingOutcome.archetypeTitle}</p>
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={() => {
+                      onNavigateChapter('ending');
+                      onCloseModal();
+                    }}
+                    className="w-full text-left cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between text-xs font-mono-archival text-[#A6C7A9]">
+                      <span>2075</span>
+                      <Compass className="w-3.5 h-3.5" aria-hidden="true" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-[#F0F2F2] group-hover:text-[#A6C7A9] mt-3">
+                      Archive Core
+                    </h3>
+                    <p className="text-xs text-[#899398] mt-1">{endingOutcome.archetypeTitle}</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
                       onNavigateChapter('credits');
                       onCloseModal();
                     }}
@@ -532,7 +561,7 @@ export const MemoryMapRail: React.FC<MemoryMapRailProps> = ({
                 <div className="pt-2 border-t border-white/10 text-xs font-mono-archival text-[#BFC7CB]">
                   {endingOutcome.pathId}
                 </div>
-              </button>
+              </div>
             </div>
           </div>
         </div>

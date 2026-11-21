@@ -403,4 +403,48 @@ await runTest('Archivist API handles missing keys, invalid models, quotas, and s
   }
 });
 
+await runTest('Archivist API enforces upstream timeout, triggers AbortSignal, and isolates dev diagnostics', async () => {
+  let sawAbortSignal = false;
+  const timedOut = await handleArchivistRequest(
+    { question: 'Why does fire spark technological history?' },
+    {
+      apiKey: 'AIzaTestSecretShouldNeverLeak',
+      upstreamTimeoutMs: 45,
+      includeDevDiagnostics: true,
+      generateContentFn: ({ signal }) =>
+        new Promise((_resolve, reject) => {
+          signal?.addEventListener('abort', () => {
+            sawAbortSignal = true;
+            const err = new Error('aborted by signal');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        }),
+    }
+  );
+
+  assert.equal(sawAbortSignal, true, 'Upstream abort signal must fire on timeout');
+  assert.equal(timedOut.status, 504);
+  assert.equal(timedOut.body.ok, false);
+  if (!timedOut.body.ok) {
+    assert.equal(timedOut.body.code, 'UPSTREAM_TIMEOUT');
+    assert.ok(timedOut.body.diagnostics, 'Dev diagnostics should be attached when enabled');
+    assert.equal(timedOut.body.diagnostics?.model, 'gemini-4-hydrogen');
+    assert.ok((timedOut.body.diagnostics?.durationMs ?? 0) >= 35);
+    assert.ok(!JSON.stringify(timedOut.body).includes('AIzaTestSecretShouldNeverLeak'));
+  }
+
+  const prodTimedOut = await handleArchivistRequest(
+    { question: 'Production mode omits diagnostics' },
+    {
+      apiKey: 'AIzaProdSecret',
+      upstreamTimeoutMs: 25,
+      includeDevDiagnostics: false,
+      generateContentFn: () => new Promise(() => {}),
+    }
+  );
+  assert.equal(prodTimedOut.status, 504);
+  assert.equal(prodTimedOut.body.diagnostics, undefined, 'Production mode must omit dev diagnostics');
+});
+
 console.log(`\nAll ${passed} tests passed.`);

@@ -224,9 +224,15 @@ export const ArchiveCollectionModal: React.FC<ArchiveCollectionModalProps> = ({
         </div>
 
         {/* Category Segmented Tabs */}
-        <div className="mt-3.5 flex flex-wrap gap-1.5 p-1 bg-[#090B0D] border border-white/10 rounded-lg w-fit">
+        <div
+          role="tablist"
+          aria-label="Journal and Archive categories"
+          className="mt-3.5 flex flex-wrap gap-1.5 p-1 bg-[#090B0D] border border-white/10 rounded-lg w-fit"
+        >
           <button
             type="button"
+            role="tab"
+            aria-selected={tab === 'journal'}
             onClick={() => setTab('journal')}
             className={`px-3 py-1.5 text-xs font-medium rounded transition-colors cursor-pointer whitespace-nowrap ${
               tab === 'journal' ? 'bg-[#A6C7A9] text-[#090B0D]' : 'text-[#899398] hover:text-[#F0F2F2]'
@@ -236,6 +242,8 @@ export const ArchiveCollectionModal: React.FC<ArchiveCollectionModalProps> = ({
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={tab === 'artifacts'}
             onClick={() => setTab('artifacts')}
             className={`px-3 py-1.5 text-xs font-medium rounded transition-colors cursor-pointer whitespace-nowrap ${
               tab === 'artifacts' ? 'bg-[#F0F2F2] text-[#090B0D]' : 'text-[#899398] hover:text-[#F0F2F2]'
@@ -245,6 +253,8 @@ export const ArchiveCollectionModal: React.FC<ArchiveCollectionModalProps> = ({
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={tab === 'lost'}
             onClick={() => setTab('lost')}
             className={`px-3 py-1.5 text-xs font-medium rounded transition-colors cursor-pointer whitespace-nowrap ${
               tab === 'lost' ? 'bg-[#F0F2F2] text-[#090B0D]' : 'text-[#899398] hover:text-[#F0F2F2]'
@@ -254,6 +264,8 @@ export const ArchiveCollectionModal: React.FC<ArchiveCollectionModalProps> = ({
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={tab === 'files'}
             onClick={() => setTab('files')}
             className={`px-3 py-1.5 text-xs font-medium rounded transition-colors cursor-pointer whitespace-nowrap ${
               tab === 'files' ? 'bg-[#F0F2F2] text-[#090B0D]' : 'text-[#899398] hover:text-[#F0F2F2]'
@@ -263,6 +275,8 @@ export const ArchiveCollectionModal: React.FC<ArchiveCollectionModalProps> = ({
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={tab === 'secrets'}
             onClick={() => setTab('secrets')}
             className={`px-3 py-1.5 text-xs font-medium rounded transition-colors cursor-pointer whitespace-nowrap ${
               tab === 'secrets' ? 'bg-[#A6C7A9] text-[#090B0D]' : 'text-[#899398] hover:text-[#F0F2F2]'
@@ -272,6 +286,8 @@ export const ArchiveCollectionModal: React.FC<ArchiveCollectionModalProps> = ({
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={tab === 'events'}
             onClick={() => setTab('events')}
             className={`px-3 py-1.5 text-xs font-medium rounded transition-colors cursor-pointer whitespace-nowrap ${
               tab === 'events' ? 'bg-[#F0F2F2] text-[#090B0D]' : 'text-[#899398] hover:text-[#F0F2F2]'

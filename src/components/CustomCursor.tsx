@@ -245,10 +245,18 @@ export const CustomCursor: React.FC<CustomCursorProps> = ({
       p.rippleAge = 0;
     };
 
+    const onPointerUp = () => {
+      if (magneticTarget && !magneticTarget.isConnected) {
+        clearMagnetic();
+      }
+    };
+
     window.addEventListener('pointermove', onPointerMove, { passive: true });
     document.addEventListener('mouseleave', onPointerLeave);
+    window.addEventListener('blur', onPointerLeave);
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('pointerdown', onPointerDown, { passive: true });
+    window.addEventListener('pointerup', onPointerUp, { passive: true });
     window.addEventListener('resize', resizeCanvas);
 
     const frame = (now: number) => {
@@ -349,8 +357,10 @@ export const CustomCursor: React.FC<CustomCursorProps> = ({
       clearMagnetic();
       window.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('mouseleave', onPointerLeave);
+      window.removeEventListener('blur', onPointerLeave);
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('resize', resizeCanvas);
     };
   }, [enabled]);

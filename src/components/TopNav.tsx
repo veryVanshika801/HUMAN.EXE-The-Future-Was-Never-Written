@@ -280,6 +280,19 @@ export const TopNav: React.FC<TopNavProps> = ({
                     {completionPercentage}%
                   </span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigateAndClose('credits')}
+                  className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors cursor-pointer flex items-center justify-between ${
+                    activeChapter === 'credits'
+                      ? 'bg-[#17211C] border-[#A6C7A9] text-[#F0F2F2]'
+                      : 'bg-[#090B0D] border-white/10 text-[#BFC7CB]'
+                  }`}
+                >
+                  <span>Credits &amp; Colophon</span>
+                  <span className="font-mono-archival text-[10px] text-[#899398]">06</span>
+                </button>
               </div>
 
               {/* Utilities */}

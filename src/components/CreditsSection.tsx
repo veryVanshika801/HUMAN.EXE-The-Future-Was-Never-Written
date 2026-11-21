@@ -23,10 +23,14 @@ export const CreditsSection: React.FC<CreditsSectionProps> = ({
 
   useEffect(() => {
     const el = sectionRef.current;
-    if (!el || reducedMotion) return;
+    if (!el) return;
+    const items = el.querySelectorAll('.credits-reveal');
+    if (reducedMotion) {
+      gsap.set(items, { opacity: 1, y: 0, clearProps: 'transform' });
+      return;
+    }
 
     const ctx = gsap.context(() => {
-      const items = el.querySelectorAll('.credits-reveal');
       gsap.fromTo(
         items,
         { y: 24, opacity: 0 },

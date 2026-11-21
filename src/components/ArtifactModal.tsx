@@ -60,11 +60,16 @@ const ArtifactAutopsyViewport: React.FC<AutopsyViewportProps> = ({
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
   const rotRef = useRef({ x: 0.14, y: -0.35 });
+  const renderOnceRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     rotRef.current = { x: 0.14, y: -0.35 };
     setZoom(1.0);
   }, [artifact.id, resetTick]);
+
+  useEffect(() => {
+    renderOnceRef.current?.();
+  }, [zoom, resetTick]);
 
   useEffect(() => {
     const host = containerRef.current;
@@ -176,11 +181,13 @@ const ArtifactAutopsyViewport: React.FC<AutopsyViewportProps> = ({
         tmpVec.set(hs.position[0], hs.position[1], hs.position[2]);
         specimenRig.group.localToWorld(tmpVec);
         tmpVec.project(camera);
+        const rawX = (tmpVec.x * 0.5 + 0.5) * w;
+        const rawY = (-tmpVec.y * 0.5 + 0.5) * h;
         return {
           id: hs.id,
           label: hs.label,
-          x: (tmpVec.x * 0.5 + 0.5) * w,
-          y: (-tmpVec.y * 0.5 + 0.5) * h,
+          x: Math.max(52, Math.min(Math.max(52, w - 52), rawX)),
+          y: Math.max(44, Math.min(Math.max(44, h - 22), rawY)),
           visible: tmpVec.z < 1.0,
         };
       });
@@ -196,6 +203,13 @@ const ArtifactAutopsyViewport: React.FC<AutopsyViewportProps> = ({
       renderer.render(scene, camera);
       projectHotspots();
     };
+    renderOnceRef.current = renderOnce;
+
+    const handleContextRestored = () => {
+      setGlFallback(false);
+      renderOnce();
+    };
+    renderer.domElement.addEventListener('webglcontextrestored', handleContextRestored);
 
     const onPointerDown = (e: PointerEvent) => {
       dragging = true;
@@ -267,9 +281,11 @@ const ArtifactAutopsyViewport: React.FC<AutopsyViewportProps> = ({
 
     return () => {
       disposed = true;
+      renderOnceRef.current = null;
       cancelAnimationFrame(rafId);
       resizeObserver?.disconnect();
       renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
+      renderer.domElement.removeEventListener('webglcontextrestored', handleContextRestored);
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
@@ -308,12 +324,11 @@ const ArtifactAutopsyViewport: React.FC<AutopsyViewportProps> = ({
         />
       )}
 
-      {glFallback ? (
-        <div className="w-full h-full flex items-center justify-center text-xs font-mono-archival text-[#899398]">
+      <div ref={containerRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+      {glFallback && (
+        <div className="absolute inset-0 z-20 bg-[#06080A]/95 flex items-center justify-center px-4 text-center text-xs font-mono-archival text-[#899398]">
           3D SPECIMEN PREVIEW UNAVAILABLE · USE COMPONENT INDEX BELOW
         </div>
-      ) : (
-        <div ref={containerRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
       )}
 
       {/* Interactive 3D-Projected Component Hotspots */}

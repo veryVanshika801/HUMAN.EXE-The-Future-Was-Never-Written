@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Send, X, AlertCircle, RefreshCw, Sparkles, Compass } from 'lucide-react';
 import { ArchiveProgressState, ChapterId, PathOutcome } from '../types/archive';
 import { calculateLiveHumanityIndex } from '../logic/decisionEngine';
@@ -12,6 +12,12 @@ interface ArchivistMessage {
   model?: string;
 }
 
+interface ArchivistDiagnostics {
+  durationMs: number;
+  model: string;
+  upstreamStatus?: number | string;
+}
+
 interface ArchivistModalProps {
   isOpen: boolean;
   activeChapter: ChapterId;
@@ -20,6 +26,8 @@ interface ArchivistModalProps {
   completionPercentage: number;
   onClose: () => void;
 }
+
+const CLIENT_REQUEST_TIMEOUT_MS = 28_000;
 
 export const ArchivistModal: React.FC<ArchivistModalProps> = ({
   isOpen,
@@ -36,9 +44,39 @@ export const ArchivistModal: React.FC<ArchivistModalProps> = ({
   const [errorTitle, setErrorTitle] = useState<string>('TRANSMISSION ERROR');
   const [allowRetry, setAllowRetry] = useState<boolean>(true);
   const [lastFailedQuestion, setLastFailedQuestion] = useState<string | null>(null);
+  const [devDiagnostics, setDevDiagnostics] = useState<ArchivistDiagnostics | null>(null);
 
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const requestTimeoutRef = useRef<number | null>(null);
+  const inFlightRef = useRef(false);
+
   useDialogAccessibility(isOpen, onClose, panelRef);
+
+  const abortActiveRequest = () => {
+    if (requestTimeoutRef.current !== null) {
+      window.clearTimeout(requestTimeoutRef.current);
+      requestTimeoutRef.current = null;
+    }
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    inFlightRef.current = false;
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (!isOpen) {
+      abortActiveRequest();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    return () => {
+      abortActiveRequest();
+    };
+  }, []);
 
   const humanityIndex = useMemo(
     () => calculateLiveHumanityIndex(state.decisions, state),
@@ -64,16 +102,19 @@ export const ArchivistModal: React.FC<ArchivistModalProps> = ({
 
   const submitQuery = async (queryText: string) => {
     const trimmed = queryText.trim();
-    if (!trimmed || loading) return;
+    if (!trimmed || inFlightRef.current || loading) return;
 
     audioEngine.playEraSound('click');
+    inFlightRef.current = true;
     setErrorMsg(null);
     setErrorTitle('TRANSMISSION ERROR');
     setAllowRetry(true);
     setLastFailedQuestion(null);
+    setDevDiagnostics(null);
 
+    const userMsgId = `u-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const userMsg: ArchivistMessage = {
-      id: `u-${Date.now()}`,
+      id: userMsgId,
       role: 'user',
       text: trimmed,
     };
@@ -87,10 +128,20 @@ export const ArchivistModal: React.FC<ArchivistModalProps> = ({
     setQuestion('');
     setLoading(true);
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    let timedOut = false;
+
+    requestTimeoutRef.current = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, CLIENT_REQUEST_TIMEOUT_MS);
+
     try {
       const response = await fetch('/api/archivist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           question: trimmed,
           history: priorHistory,
@@ -122,10 +173,14 @@ export const ArchivistModal: React.FC<ArchivistModalProps> = ({
             answer?: string;
             model?: string;
             error?: string;
+            diagnostics?: ArchivistDiagnostics;
           }
         | null;
 
       if (!response.ok || !data?.ok || !data.answer) {
+        // Remove the failed optimistic user message so retries do not duplicate turns in history
+        setMessages((prev) => prev.filter((m) => m.id !== userMsgId));
+
         const code = data?.code ?? 'UPSTREAM_ERROR';
         if (code === 'MISSING_API_KEY' || code === 'INVALID_API_KEY') {
           setErrorTitle('SERVER ARCHIVIST CREDENTIAL OFFLINE');
@@ -133,6 +188,9 @@ export const ArchivistModal: React.FC<ArchivistModalProps> = ({
         } else if (code === 'INVALID_MODEL_CONFIG') {
           setErrorTitle('MODEL CONFIGURATION ERROR');
           setAllowRetry(false);
+        } else if (code === 'UPSTREAM_TIMEOUT' || response.status === 504) {
+          setErrorTitle('TRANSMISSION TIMED OUT');
+          setAllowRetry(true);
         } else if (code === 'QUOTA_EXCEEDED' || code === 'RATE_LIMITED') {
           setErrorTitle(code === 'QUOTA_EXCEEDED' ? 'API QUOTA REACHED' : 'RATE LIMIT ACTIVE');
           setAllowRetry(true);
@@ -140,11 +198,20 @@ export const ArchivistModal: React.FC<ArchivistModalProps> = ({
           setErrorTitle('TRANSMISSION ERROR');
           setAllowRetry(true);
         }
+
+        if (import.meta.env.DEV && data?.diagnostics) {
+          setDevDiagnostics(data.diagnostics);
+        }
+
         setErrorMsg(
           data?.error || `Archivist service unavailable (HTTP ${response.status}). Please try again.`
         );
         setLastFailedQuestion(trimmed);
         return;
+      }
+
+      if (import.meta.env.DEV && data.diagnostics) {
+        setDevDiagnostics(data.diagnostics);
       }
 
       audioEngine.playEraSound('chapterUnlock');
@@ -157,10 +224,35 @@ export const ArchivistModal: React.FC<ArchivistModalProps> = ({
           model: data.model,
         },
       ]);
-    } catch {
-      setErrorMsg('Network error reaching /api/archivist. Check server connectivity and retry.');
+    } catch (err) {
+      setMessages((prev) => prev.filter((m) => m.id !== userMsgId));
+
+      const isAbort = err instanceof Error && err.name === 'AbortError';
+      if (isAbort && !timedOut) {
+        // Aborted intentionally because dialog closed or unmounted
+        return;
+      }
+
+      if (timedOut) {
+        setErrorTitle('TRANSMISSION TIMED OUT');
+        setErrorMsg(
+          'The Archivist AI request exceeded the 28-second transmission window without completing. Please retry.'
+        );
+      } else {
+        setErrorTitle('NETWORK ERROR');
+        setErrorMsg('Network error reaching /api/archivist. Check server connectivity and retry.');
+      }
+      setAllowRetry(true);
       setLastFailedQuestion(trimmed);
     } finally {
+      if (requestTimeoutRef.current !== null) {
+        window.clearTimeout(requestTimeoutRef.current);
+        requestTimeoutRef.current = null;
+      }
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
+      inFlightRef.current = false;
       setLoading(false);
     }
   };
@@ -211,16 +303,24 @@ export const ArchivistModal: React.FC<ArchivistModalProps> = ({
           </button>
         </div>
 
-        {/* Live Visitor Context Pill Strip */}
-        <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono-archival bg-[#090B0D] border border-white/10 rounded-lg px-3 py-2 text-[#BFC7CB]">
-          <Compass className="w-3.5 h-3.5 text-[#D9822B] shrink-0" aria-hidden="true" />
-          <span>SECTION: {activeChapter.toUpperCase()}</span>
-          <span className="text-[#899398]">·</span>
-          <span>DECISIONS: {humanityIndex.selectedCount}/5</span>
-          <span className="text-[#899398]">·</span>
-          <span className="text-[#A6C7A9]">
-            INDEX {humanityIndex.innovation}/{humanityIndex.connection}/{humanityIndex.humanAgency}
-          </span>
+        {/* Live Visitor Context Strip */}
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono-archival bg-[#090B0D] border border-white/10 rounded-lg px-3 py-2 text-[#BFC7CB]">
+          <div className="flex flex-wrap items-center gap-2">
+            <Compass className="w-3.5 h-3.5 text-[#D9822B] shrink-0" aria-hidden="true" />
+            <span>SECTION: {activeChapter.toUpperCase()}</span>
+            <span className="text-[#899398]">·</span>
+            <span>DECISIONS: {humanityIndex.selectedCount}/5</span>
+            <span className="text-[#899398]">·</span>
+            <span className="text-[#A6C7A9]">
+              INDEX {humanityIndex.innovation}/{humanityIndex.connection}/{humanityIndex.humanAgency}
+            </span>
+          </div>
+          {import.meta.env.DEV && devDiagnostics && (
+            <span className="text-[10px] text-[#899398]">
+              DEV TRACE: {devDiagnostics.model} · {devDiagnostics.durationMs}ms
+              {devDiagnostics.upstreamStatus !== undefined ? ` · ${devDiagnostics.upstreamStatus}` : ''}
+            </span>
+          )}
         </div>
 
         {/* Suggested Prompts */}

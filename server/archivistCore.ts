@@ -38,7 +38,14 @@ export type ArchivistErrorCode =
   | 'PAYLOAD_TOO_LARGE'
   | 'RATE_LIMITED'
   | 'QUOTA_EXCEEDED'
+  | 'UPSTREAM_TIMEOUT'
   | 'UPSTREAM_ERROR';
+
+export interface ArchivistDevDiagnostics {
+  durationMs: number;
+  model: string;
+  upstreamStatus?: number | string;
+}
 
 export interface ArchivistResult {
   status: number;
@@ -49,6 +56,7 @@ export interface ArchivistResult {
         configured: true;
         answer: string;
         model: string;
+        diagnostics?: ArchivistDevDiagnostics;
       }
     | {
         ok: false;
@@ -56,8 +64,11 @@ export interface ArchivistResult {
         code: ArchivistErrorCode;
         error: string;
         retryAfterSeconds?: number;
+        diagnostics?: ArchivistDevDiagnostics;
       };
 }
+
+export const DEFAULT_UPSTREAM_TIMEOUT_MS = 22_000;
 
 export const MAX_ARCHIVIST_PAYLOAD_BYTES = 32 * 1024;
 export const MAX_QUESTION_LENGTH = 1200;
@@ -321,18 +332,52 @@ export function resolveConfiguredModel(modelOverride?: string): {
   return { valid: true, modelId: candidate };
 }
 
-function classifyAndSanitizeGeminiError(err: unknown): ArchivistResult {
+class ArchivistTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`Archivist upstream request exceeded ${timeoutMs}ms`);
+    this.name = 'ArchivistTimeoutError';
+  }
+}
+
+function classifyAndSanitizeGeminiError(
+  err: unknown,
+  diagnostics?: ArchivistDevDiagnostics
+): ArchivistResult {
   const record =
-    err && typeof err === 'object' ? (err as { status?: unknown; code?: unknown; message?: unknown }) : {};
+    err && typeof err === 'object' ? (err as { status?: unknown; code?: unknown; message?: unknown; name?: unknown }) : {};
   const numericStatus = typeof record.status === 'number' ? record.status : undefined;
   const rawMessage = err instanceof Error ? err.message : String(record.message ?? '');
   const lower = rawMessage.toLowerCase();
+  const isTimeout =
+    err instanceof ArchivistTimeoutError ||
+    record.name === 'ArchivistTimeoutError' ||
+    record.name === 'AbortError' ||
+    lower.includes('timed out') ||
+    lower.includes('timeout') ||
+    lower.includes('aborted');
 
   // Log terse diagnostic server-side only (never sent to browser, never includes API key)
   console.error('[Archivist API Upstream Failure]', {
-    status: numericStatus ?? 'unknown',
-    code: typeof record.code === 'string' ? record.code : 'unknown',
+    status: numericStatus ?? (isTimeout ? 504 : 'unknown'),
+    code: typeof record.code === 'string' ? record.code : isTimeout ? 'UPSTREAM_TIMEOUT' : 'unknown',
+    durationMs: diagnostics?.durationMs,
   });
+
+  const withDiag = <T extends object>(body: T): T & { diagnostics?: ArchivistDevDiagnostics } =>
+    diagnostics ? { ...body, diagnostics: { ...diagnostics, upstreamStatus: numericStatus ?? (isTimeout ? 'TIMEOUT' : 'UNKNOWN') } } : body;
+
+  if (isTimeout) {
+    return {
+      status: 504,
+      body: withDiag({
+        ok: false as const,
+        configured: true,
+        code: 'UPSTREAM_TIMEOUT' as const,
+        error:
+          'The Archivist AI transmission timed out before receiving a response. Please retry your query.',
+      }),
+    };
+  }
 
   if (
     numericStatus === 429 ||
@@ -343,14 +388,14 @@ function classifyAndSanitizeGeminiError(err: unknown): ArchivistResult {
     return {
       status: 429,
       headers: { 'Retry-After': '30' },
-      body: {
-        ok: false,
+      body: withDiag({
+        ok: false as const,
         configured: true,
-        code: 'QUOTA_EXCEEDED',
+        code: 'QUOTA_EXCEEDED' as const,
         retryAfterSeconds: 30,
         error:
           'The Archivist AI service has reached its current API quota limit. Please try again in a minute.',
-      },
+      }),
     };
   }
 
@@ -365,13 +410,13 @@ function classifyAndSanitizeGeminiError(err: unknown): ArchivistResult {
   ) {
     return {
       status: 500,
-      body: {
-        ok: false,
+      body: withDiag({
+        ok: false as const,
         configured: true,
-        code: 'INVALID_MODEL_CONFIG',
+        code: 'INVALID_MODEL_CONFIG' as const,
         error:
           'The configured Gemini Archivist model is unavailable or unsupported in this API environment.',
-      },
+      }),
     };
   }
 
@@ -385,25 +430,25 @@ function classifyAndSanitizeGeminiError(err: unknown): ArchivistResult {
   ) {
     return {
       status: 503,
-      body: {
-        ok: false,
+      body: withDiag({
+        ok: false as const,
         configured: false,
-        code: 'INVALID_API_KEY',
+        code: 'INVALID_API_KEY' as const,
         error:
           'The server Gemini API credential could not be authenticated for this service.',
-      },
+      }),
     };
   }
 
   if (numericStatus === 400) {
     return {
       status: 400,
-      body: {
-        ok: false,
+      body: withDiag({
+        ok: false as const,
         configured: true,
-        code: 'INVALID_REQUEST',
+        code: 'INVALID_REQUEST' as const,
         error: 'The Archivist query format was rejected by the upstream service. Please rephrase and retry.',
-      },
+      }),
     };
   }
 
@@ -411,24 +456,24 @@ function classifyAndSanitizeGeminiError(err: unknown): ArchivistResult {
     return {
       status: 503,
       headers: { 'Retry-After': '10' },
-      body: {
-        ok: false,
+      body: withDiag({
+        ok: false as const,
         configured: true,
-        code: 'UPSTREAM_ERROR',
+        code: 'UPSTREAM_ERROR' as const,
         retryAfterSeconds: 10,
         error: 'The Archivist AI model is experiencing temporary high demand. Please retry in a few seconds.',
-      },
+      }),
     };
   }
 
   return {
     status: 502,
-    body: {
-      ok: false,
+    body: withDiag({
+      ok: false as const,
       configured: true,
-      code: 'UPSTREAM_ERROR',
+      code: 'UPSTREAM_ERROR' as const,
       error: 'Unable to reach the Archivist AI service right now. Please try again shortly.',
-    },
+    }),
   };
 }
 
@@ -438,11 +483,14 @@ export interface HandleArchivistOptions {
   clientIp?: string;
   rateLimiter?: RateLimiter;
   nowMs?: number;
+  upstreamTimeoutMs?: number;
+  includeDevDiagnostics?: boolean;
   generateContentFn?: (params: {
     apiKey: string;
     model: string;
     contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>;
     systemInstruction: string;
+    signal?: AbortSignal;
   }) => Promise<{ text?: string }>;
 }
 
@@ -621,35 +669,58 @@ export async function handleArchivistRequest(
     },
   ];
 
-  // 5. Execute Server-Side Gemini Call (Never fabricate answers on error)
+  // 5. Execute Server-Side Gemini Call with Bounded Timeout (Never fabricate answers on error)
+  const timeoutMs =
+    typeof opts.upstreamTimeoutMs === 'number' && Number.isFinite(opts.upstreamTimeoutMs) && opts.upstreamTimeoutMs > 0
+      ? opts.upstreamTimeoutMs
+      : DEFAULT_UPSTREAM_TIMEOUT_MS;
+  const allowDevDiagnostics = opts.includeDevDiagnostics ?? process.env.NODE_ENV !== 'production';
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
   try {
-    let answerText: string | undefined;
-    if (opts.generateContentFn) {
-      const mocked = await opts.generateContentFn({
-        apiKey: cleanedKey,
-        model: modelCheck.modelId,
-        contents,
-        systemInstruction: SYSTEM_INSTRUCTION,
-      });
-      answerText = mocked.text;
-    } else {
+    const runUpstream = async () => {
+      if (opts.generateContentFn) {
+        return opts.generateContentFn({
+          apiKey: cleanedKey,
+          model: modelCheck.modelId,
+          contents,
+          systemInstruction: SYSTEM_INSTRUCTION,
+          signal: controller.signal,
+        });
+      }
+
       const ai = new GoogleGenAI({
         apiKey: cleanedKey,
-        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
+        httpOptions: {
+          timeout: timeoutMs,
+          headers: { 'User-Agent': 'aistudio-build' },
+        },
       });
 
-      const response = await ai.models.generateContent({
+      return ai.models.generateContent({
         model: modelCheck.modelId,
         contents,
         config: {
+          abortSignal: controller.signal,
           systemInstruction: SYSTEM_INSTRUCTION,
           thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         },
       });
-      answerText = response.text;
-    }
+    };
 
-    const answer = answerText?.trim();
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timeoutId = setTimeout(() => {
+        controller.abort();
+        reject(new ArchivistTimeoutError(timeoutMs));
+      }, timeoutMs);
+    });
+
+    const response = await Promise.race([runUpstream(), timeoutPromise]);
+    const durationMs = Date.now() - startedAt;
+    const answer = response.text?.trim();
+
     if (!answer) {
       return {
         status: 502,
@@ -658,6 +729,9 @@ export async function handleArchivistRequest(
           configured: true,
           code: 'UPSTREAM_ERROR',
           error: 'The Archivist returned an empty transmission. Please retry your query.',
+          ...(allowDevDiagnostics
+            ? { diagnostics: { durationMs, model: modelCheck.modelId, upstreamStatus: 'EMPTY_TEXT' } }
+            : {}),
         },
       };
     }
@@ -669,9 +743,20 @@ export async function handleArchivistRequest(
         configured: true,
         answer,
         model: modelCheck.modelId,
+        ...(allowDevDiagnostics
+          ? { diagnostics: { durationMs, model: modelCheck.modelId, upstreamStatus: 200 } }
+          : {}),
       },
     };
   } catch (err) {
-    return classifyAndSanitizeGeminiError(err);
+    const durationMs = Date.now() - startedAt;
+    return classifyAndSanitizeGeminiError(
+      err,
+      allowDevDiagnostics ? { durationMs, model: modelCheck.modelId } : undefined
+    );
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
   }
 }

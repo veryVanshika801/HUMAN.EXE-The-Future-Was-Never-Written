@@ -178,6 +178,8 @@ export function App() {
   const navigateToChapter = useCallback(
     (id: ChapterId) => {
       audioEngine.playEraSound('click');
+      setSoundPanelOpen(false);
+      setHoveredTarget(null);
       const el = document.getElementById(id);
       if (el) {
         el.scrollIntoView({ behavior: state.reducedMotion ? 'auto' : 'smooth', block: 'start' });
@@ -341,21 +343,26 @@ export function App() {
       </Suspense>
 
       {/* Crisp Floating Physical 3D Hover Label */}
-      {hoveredTarget && !selectedArtifact && (
-        <div
-          aria-hidden="true"
-          className="no-print fixed z-30 pointer-events-none -translate-x-1/2 -translate-y-full pb-2"
-          style={{
-            left: `${Math.min(window.innerWidth - 120, Math.max(120, hoveredTarget.x))}px`,
-            top: `${Math.min(window.innerHeight - 40, Math.max(72, hoveredTarget.y - 12))}px`,
-          }}
-        >
-          <div className="bg-[#090B0D]/95 border border-white/20 rounded px-2.5 py-1.5 shadow-xl text-center">
-            <div className="text-[10px] font-mono-archival text-[#A6C7A9]">{hoveredTarget.sublabel}</div>
-            <div className="text-xs font-medium text-[#F0F2F2] whitespace-nowrap">{hoveredTarget.label}</div>
+      {hoveredTarget &&
+        !selectedArtifact &&
+        !memoryMapOpen &&
+        !collectionOpen &&
+        !archivistOpen &&
+        !soundPanelOpen && (
+          <div
+            aria-hidden="true"
+            className="no-print fixed z-30 pointer-events-none -translate-x-1/2 -translate-y-full pb-2"
+            style={{
+              left: `${Math.min(window.innerWidth - 96, Math.max(96, hoveredTarget.x))}px`,
+              top: `${Math.min(window.innerHeight - 40, Math.max(72, hoveredTarget.y - 12))}px`,
+            }}
+          >
+            <div className="bg-[#090B0D]/95 border border-white/20 rounded px-2.5 py-1.5 shadow-xl text-center">
+              <div className="text-[10px] font-mono-archival text-[#A6C7A9]">{hoveredTarget.sublabel}</div>
+              <div className="text-xs font-medium text-[#F0F2F2] whitespace-nowrap">{hoveredTarget.label}</div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Controlled Time Fracture Visual Flash */}
       {timeFractureActive && (
@@ -374,11 +381,23 @@ export function App() {
         soundPanelOpen={soundPanelOpen}
         reducedMotion={state.reducedMotion}
         onToggleSound={toggleSound}
-        onToggleSoundPanel={() => setSoundPanelOpen((prev) => !prev)}
+        onToggleSoundPanel={() => {
+          setHoveredTarget(null);
+          setSoundPanelOpen((prev) => !prev);
+        }}
         onToggleReducedMotion={toggleReducedMotion}
-        onOpenMemoryMap={() => setMemoryMapOpen(true)}
-        onOpenArchiveLog={() => setCollectionOpen(true)}
-        onOpenArchivist={() => setArchivistOpen(true)}
+        onOpenMemoryMap={() => {
+          setHoveredTarget(null);
+          setMemoryMapOpen(true);
+        }}
+        onOpenArchiveLog={() => {
+          setHoveredTarget(null);
+          setCollectionOpen(true);
+        }}
+        onOpenArchivist={() => {
+          setHoveredTarget(null);
+          setArchivistOpen(true);
+        }}
         onNavigateChapter={navigateToChapter}
         onJumpToTop={() => navigateToChapter('intro')}
         onJumpToEnding={() => navigateToChapter('ending')}

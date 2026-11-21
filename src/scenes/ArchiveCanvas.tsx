@@ -1639,7 +1639,10 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
       return { id, label, sublabel, kind, x, y };
     };
 
+    let pointerDownOnCanvas = false;
+
     const onPointerDown = (e: PointerEvent) => {
+      pointerDownOnCanvas = true;
       dragStartX = e.clientX;
       dragStartY = e.clientY;
       dragMoved = false;
@@ -1660,6 +1663,16 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
         globeRotXVel += dy * 0.0032;
         dragStartX = e.clientX;
         dragStartY = e.clientY;
+        return;
+      }
+
+      // Do not raycast through UI buttons, cards, or open modals covering the canvas
+      if (e.target !== renderer.domElement) {
+        if (hoveredObjectId !== null) {
+          hoveredObjectId = null;
+          callbacksRef.current.onHoverTarget?.(null);
+        }
+        renderer.domElement.style.cursor = 'default';
         return;
       }
 
@@ -1698,10 +1711,19 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
       }
     };
 
+    const onPointerCancel = () => {
+      pointerDownOnCanvas = false;
+      isDraggingGlobe = false;
+      dragMoved = false;
+    };
+
     const onPointerUp = (e: PointerEvent) => {
+      const startedOnCanvas = pointerDownOnCanvas;
+      pointerDownOnCanvas = false;
       const wasMoved = dragMoved;
       isDraggingGlobe = false;
-      if (wasMoved) return;
+      dragMoved = false;
+      if (!startedOnCanvas || wasMoved || e.target !== renderer.domElement) return;
 
       getCanvasCoords(e.clientX, e.clientY);
       raycaster.setFromCamera(_rayMouse, camera);
@@ -1760,6 +1782,7 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerCancel);
 
     const onResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight;
@@ -2432,6 +2455,7 @@ export const ArchiveCanvas: React.FC<ArchiveCanvasProps> = ({
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerCancel);
       window.removeEventListener('resize', onResize);
       renderer.domElement.removeEventListener('webglcontextlost', handleContextLost);
       renderer.domElement.removeEventListener('webglcontextrestored', handleContextRestored);

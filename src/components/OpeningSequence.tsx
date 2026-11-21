@@ -125,7 +125,7 @@ export const OpeningSequence: React.FC<OpeningSequenceProps> = ({
         </div>
 
         {/* Left-aligned Editorial Column keeping center-right 3D sphere unobstructed */}
-        <div className="max-w-xl my-auto pt-36 sm:pt-44 lg:pt-0 pointer-events-auto">
+        <div className="max-w-xl my-auto pt-24 sm:pt-36 lg:pt-0 pointer-events-auto">
           <div className="bg-[#090B0D]/86 lg:bg-transparent border border-white/10 lg:border-0 rounded-xl p-5 sm:p-6 lg:p-0">
             <div className="text-xs font-mono-archival text-[#899398] tracking-[0.18em] uppercase mb-3">
               {activeScene.code}
@@ -216,6 +216,7 @@ export const OpeningSequence: React.FC<OpeningSequenceProps> = ({
             <button
               type="button"
               onClick={onToggleSound}
+              aria-pressed={state.soundEnabled}
               className="inline-flex items-center gap-1.5 hover:text-[#F0F2F2] transition-colors cursor-pointer"
             >
               {state.soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-[#A6C7A9]" /> : <VolumeX className="w-3.5 h-3.5" />}
@@ -234,6 +235,7 @@ export const OpeningSequence: React.FC<OpeningSequenceProps> = ({
             <button
               type="button"
               onClick={onToggleReducedMotion}
+              aria-pressed={state.reducedMotion}
               className="hover:text-[#F0F2F2] transition-colors cursor-pointer"
             >
               {state.reducedMotion ? 'Motion: Reduced' : 'Motion: Full'}

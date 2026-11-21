@@ -227,22 +227,26 @@ export const CorruptedFilesPanel: React.FC<CorruptedFilesPanelProps> = ({
   }, []);
 
   const triggerFinalRestore = (file: CorruptedFileItem) => {
-    if (repairingId) return;
+    if (repairingId || repairedFiles.includes(file.id)) return;
     audioEngine.playEraSound('glitch');
     setRepairingId(file.id);
-    setRepairProgress(22);
+    setRepairProgress(reducedMotion ? 50 : 22);
+
+    const step1 = reducedMotion ? 40 : 220;
+    const step2 = reducedMotion ? 80 : 460;
+    const doneMs = reducedMotion ? 120 : 740;
 
     restoreTimersRef.current.forEach((id) => window.clearTimeout(id));
     restoreTimersRef.current = [
-      window.setTimeout(() => setRepairProgress(60), 220),
-      window.setTimeout(() => setRepairProgress(90), 460),
+      window.setTimeout(() => setRepairProgress(60), step1),
+      window.setTimeout(() => setRepairProgress(90), step2),
       window.setTimeout(() => {
         onRepairFile(file.id);
         setRepairingId(null);
         setRepairProgress(0);
         setActiveLabFileId(null);
         setExpandedFileId(file.id);
-      }, 740),
+      }, doneMs),
     ];
   };
 

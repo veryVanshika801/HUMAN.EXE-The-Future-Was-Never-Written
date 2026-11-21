@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Volume2, VolumeX, SlidersHorizontal, X, Mic, MicOff } from 'lucide-react';
 import { AudioSettings } from '../types/archive';
 import { useDialogAccessibility } from '../hooks/useDialogAccessibility';
@@ -18,6 +18,19 @@ export const SoundControlPanel: React.FC<SoundControlPanelProps> = ({
 }) => {
   const panelRef = useRef<HTMLDivElement | null>(null);
   useDialogAccessibility(isOpen, onClose, panelRef, { lockScroll: false });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (panelRef.current?.contains(target)) return;
+      if (target.closest('[aria-label="Open spatial audio mixer"]')) return;
+      onClose();
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -60,6 +73,7 @@ export const SoundControlPanel: React.FC<SoundControlPanelProps> = ({
         <button
           type="button"
           onClick={() => onUpdateAudio({ enabled: !audio.enabled })}
+          aria-pressed={audio.enabled}
           className={`flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded border transition-colors cursor-pointer ${
             audio.enabled
               ? 'bg-[#A6C7A9] text-[#090B0D] border-[#A6C7A9]'
@@ -73,6 +87,7 @@ export const SoundControlPanel: React.FC<SoundControlPanelProps> = ({
         <button
           type="button"
           onClick={() => onUpdateAudio({ muted: !audio.muted })}
+          aria-pressed={audio.muted}
           className={`px-3 py-2 text-xs font-medium rounded border transition-colors cursor-pointer ${
             audio.muted
               ? 'bg-[#C95D3A]/20 text-[#C95D3A] border-[#C95D3A]/50'
@@ -123,6 +138,7 @@ export const SoundControlPanel: React.FC<SoundControlPanelProps> = ({
                 narrationEnabled: !audio.narrationEnabled,
               })
             }
+            aria-pressed={audio.narrationEnabled}
             className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-mono-archival rounded border transition-colors cursor-pointer ${
               audio.narrationEnabled
                 ? 'bg-[#A6C7A9]/20 text-[#A6C7A9] border-[#A6C7A9]/60'
